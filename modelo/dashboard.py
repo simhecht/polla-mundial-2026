@@ -42,7 +42,7 @@ def build_html(groups_data, bracket_data):
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Polla Mundial 2026 — Predicciones v3.1</title>
+<title>Polla Mundial 2026 — Predicciones v3.2</title>
 <style>
 :root {{
   --bg:#0f172a;--card:#1e293b;--border:#334155;
@@ -137,7 +137,7 @@ footer{{text-align:center;padding:2rem;color:var(--muted);font-size:.8rem;border
 <body>
 <header>
   <h1>⚽ POLLA MUNDIAL 2026</h1>
-  <p>Modelo v3.1 · Poisson + Dixon-Coles (ρ=−0.10) · ELO^2.8/2.1 · Ventaja local anfitriones · Calibrado 9 jun 2026</p>
+  <p>Modelo v3.2 · Poisson + Dixon-Coles (ρ=−0.10) · ELO^2.8/2.1 · Resultado dominante → marcador · Calibrado 9 jun 2026</p>
 </header>
 
 <div class="container">
@@ -150,10 +150,10 @@ footer{{text-align:center;padding:2rem;color:var(--muted);font-size:.8rem;border
   <!-- ────── TAB GRUPOS ────── -->
   <div id="grupos" class="tab-content active">
     <div class="model-info">
-      <strong>Modelo v3.1:</strong> ELO exponente 2.8/2.1 (calibrado 9 jun 2026 · 19 amistosos + 12 cuotas mercado) ·
+      <strong>Modelo v3.2:</strong> ELO exponente 2.8/2.1 (calibrado 9 jun 2026 · 19 amistosos + 12 cuotas mercado) ·
       Forma ±25% cap · Ventaja local: 🇲🇽 +20% / 🇺🇸 +13% / 🇨🇦 +10% ·
-      Corrección Dixon-Coles ρ=−0.10 · <strong>%Clasif</strong> = Monte Carlo 20,000 simulaciones ·
-      Validación: 79% dir · 74% top-3 · 42% exacto
+      Dixon-Coles ρ=−0.10 · Marcador: resultado dominante → mejor marcador en esa categoría (margen ≥5pp) ·
+      <strong>%Clasif</strong> = Monte Carlo 20,000 simulaciones · Validación: 79% dir · 74% top-3 · 42% exacto
     </div>
     <div class="legend">
       <div class="legend-item"><div class="legend-box" style="background:rgba(16,185,129,.4)"></div> Clasifican directo (1° y 2°)</div>
@@ -202,14 +202,17 @@ footer{{text-align:center;padding:2rem;color:var(--muted);font-size:.8rem;border
       fútbol internacional. Ajusta la probabilidad de marcadores bajos (0-0, 1-0, 0-1).</p><br>
       <p><strong style="color:var(--accent)">Monte Carlo 20,000 iter.:</strong> % de clasificación
       real, no solo el marcador modal. Empates en eliminatoria se resuelven con prórroga y penales.</p><br>
-      <p><strong style="color:var(--accent)">Nota sobre empates:</strong> El modelo predice ~50% de empates
-      como marcador modal en grupos (histórico WC ≈ 25%). Esto ocurre porque el argmax de Poisson
-      con λ≈1.17 simétrico elige 1-1 frecuentemente. Las probabilidades %MC son la fuente correcta.</p>
+      <p><strong style="color:var(--accent)">Selección de marcador (v3.2):</strong> En vez del marcador
+      individual más probable (que tiende al 1-1 en duelos equilibrados), el modelo elige primero el
+      <em>resultado dominante</em> (victoria local/empate/visita por prob. acumulada). Si la diferencia
+      entre prob. local y visitante es menor a 5pp, el partido se trata como empate. Luego se elige el
+      mejor marcador dentro de esa categoría. Esto alinea los pronósticos con el histórico mundialista:
+      ~15% de 1-1 en eliminatorias (1990–2022), no el 84% que generaba v3.1.</p>
     </div>
   </div>
 </div>
 
-<footer>Polla Mundial 2026 · Predictor v3.1 · Calibrado 9 jun 2026 · Monte Carlo 20k sims</footer>
+<footer>Polla Mundial 2026 · Predictor v3.2 · Calibrado 9 jun 2026 · Monte Carlo 20k sims · Result-first scoring</footer>
 
 <script>
 const GROUPS_DATA = {gj};

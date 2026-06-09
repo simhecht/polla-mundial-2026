@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import sqlite3, math
 import numpy as np
 from predictor_v3 import (
-    get_team, compute_lambdas, score_matrix_dc,
+    get_team, compute_lambdas, score_matrix_dc, best_score_result_first,
     DB_PATH, regenerate_db
 )
 
@@ -84,10 +84,11 @@ def predict_ko_match(th, ta, factor=KO_FACTOR):
     prob_h = sum(p for (gh, ga), p in matrix.items() if gh > ga)
     prob_d = sum(p for (gh, ga), p in matrix.items() if gh == ga)
     prob_a = sum(p for (gh, ga), p in matrix.items() if gh < ga)
-    best   = sorted(matrix.items(), key=lambda x: -x[1])[0][0]
+    best   = best_score_result_first(matrix)
 
-    # En eliminatoria empate → prórroga; el favorito (mayor prob_win) avanza
+    # Determinar ganador a partir del marcador elegido (result-first v3.2)
     if best[0] == best[1]:
+        # Empate en 90' → prórroga; avanza el favorito
         winner = th if prob_h >= prob_a else ta
     else:
         winner = th if best[0] > best[1] else ta
