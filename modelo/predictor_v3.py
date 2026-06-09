@@ -37,6 +37,11 @@ AVG_ELO = 1600
 # form=3 → ×0.90, form=5 → ×1.00, form=9 → ×1.20
 FORM_CAP = 0.25   # ½ de 0.25 por punto de desviación respecto a 5.0
 
+# v3.2: selección de marcador result-first
+# Si la diferencia entre prob_local y prob_visitante < este umbral,
+# el partido se trata como empate (demasiado equilibrado para distinguir ganador).
+RESULT_MARGIN_PP = 5.0
+
 # ---------------------------------------------------------------------------
 # Ventaja de local para las tres naciones anfitrionas
 # boost: multiplicador adicional a lambda del equipo anfitrión
@@ -306,6 +311,41 @@ def score_matrix_dc(lambda_home, lambda_away, max_goals=6, rho=DIXON_COLES_RHO):
         matrix = {k: v / total for k, v in matrix.items()}
     return matrix
 
+
+def best_score_result_first(matrix):
+    """
+    Elige el marcador dentro del resultado dominante (v3.2).
+
+    Pasos:
+    1. Calcula prob acumulada: victoria local, empate, victoria visitante.
+    2. Determina el resultado dominante (mayor prob acumulada).
+    3. Si local o visitante es dominante pero la diferencia entre ambas prob de
+       victoria es menor a RESULT_MARGIN_PP puntos porcentuales, se trata como
+       empate (partido demasiado equilibrado para elegir ganador).
+    4. Retorna el marcador individual de mayor probabilidad dentro de esa categoría.
+    """
+    prob_h = sum(p for (gh, ga), p in matrix.items() if gh > ga)
+    prob_d = sum(p for (gh, ga), p in matrix.items() if gh == ga)
+    prob_a = sum(p for (gh, ga), p in matrix.items() if gh < ga)
+
+    dominant = max(
+        [('home', prob_h), ('draw', prob_d), ('away', prob_a)],
+        key=lambda x: x[1]
+    )[0]
+
+    if dominant in ('home', 'away'):
+        if abs(prob_h - prob_a) * 100 < RESULT_MARGIN_PP:
+            dominant = 'draw'
+
+    if dominant == 'home':
+        candidates = {s: p for s, p in matrix.items() if s[0] > s[1]}
+    elif dominant == 'draw':
+        candidates = {s: p for s, p in matrix.items() if s[0] == s[1]}
+    else:
+        candidates = {s: p for s, p in matrix.items() if s[0] < s[1]}
+
+    return max(candidates, key=candidates.get)
+
 # ---------------------------------------------------------------------------
 # Predicción de partido
 # ---------------------------------------------------------------------------
@@ -332,7 +372,7 @@ def predict_match(name_home, name_away, conn=None, verbose=True, venue=None):
 
     top5 = sorted(matrix.items(), key=lambda x: -x[1])[:5]
     top3 = top5[:3]
-    best_score = top3[0][0]
+    best_score = best_score_result_first(matrix)
 
     elo_diff = abs(th["elo_rating"] - ta["elo_rating"])
     confidence = "alta" if elo_diff > 250 else "media" if elo_diff > 100 else "baja"
