@@ -19,7 +19,7 @@ Todos en `/Users/simon/Desktop/polla/modelo/`:
 |---|---|
 | `setup_db.py` | Inicializa SQLite en `/tmp/mundial_2026.db`. Contiene 48 equipos + 72 fixtures. La DB es efímera (en /tmp/), hay que recrearla cada sesión. |
 | `update_all_teams.py` | Aplica datos cualitativos reales a los 48 equipos (ELO, forma, profundidad, DT, notas). **Siempre correr después de setup_db.setup()** |
-| `predictor_v3.py` | Motor principal — Poisson + Dixon-Coles (ρ=−0.10) + ELO^2.0 + host advantage. **Usar este, no v1 ni v2.** |
+| `predictor_v3.py` | Motor principal — Poisson + Dixon-Coles (ρ=−0.10) + ELO^2.8/2.1 + host advantage. **Usar este, no v1 ni v2.** |
 | `predictor_v2.py` | Versión anterior (obsoleta). Tenía ρ=−0.13, exp 0.6/0.4, form sin cap. Producía demasiados 2-1 y empates falsos. |
 | `predictor.py` | Versión original (no usar). |
 | `dashboard.py` | Genera `dashboard_mundial2026.html`. Ya actualizado para usar predictor_v3. |
@@ -82,7 +82,7 @@ Si el equipo anfitrión está listado como "away" en el DB (ej: Chequia vs Méxi
 
 ---
 
-## 4. Resultados fase de grupos (Modelo v3)
+## 4. Resultados fase de grupos (Modelo v3.1)
 
 ### GRUPO A
 | Equipo | G | E | P | GF | GC | DG | PTS |
@@ -263,7 +263,7 @@ Partidos: Inglaterra 1-1 Croacia | Ghana 1-1 Panamá | Inglaterra 2-0 Ghana | Pa
 - **Francia:** Número 1 FIFA. Dembélé Balón de Oro esta temporada. Deschamps último torneo.
 - **Costa de Marfil:** Diomandé, Kessié, Amad Diallo (Man Utd), Sangaré, Fofana (Chelsea) — plantel europeo de élite. Invictos 10 partidos en clasificación.
 - **Brasil:** Ancelotti debuta como DT. Rodrygo ausente. Neymar forma incierta. Sin Messi, favorito implícito CONMEBOL.
-- **USA:** Perdió 5-2 vs Bélgica y 2-0 vs Portugal en amistosos. Factor anfitrión los lleva a R16 mínimo.
+- **USA:** Perdió 5-2 vs Bélgica, 2-0 vs Portugal y 1-2 vs Alemania en amistosos. Factor anfitrión los lleva a R16 mínimo.
 - **Curazao:** DT Advocaat (78 años) renunció, lo reemplazó Rutten, que renunció, volvió Advocaat. 0 puntos, eliminados.
 - **Arabia Saudita:** DT Donis nombrado 7 semanas antes. 25/26 jugadores de liga local. Los peores del torneo.
 - **Iraq:** Empató 1-1 vs España en La Coruña el 5 de junio — su mejor señal previa.
