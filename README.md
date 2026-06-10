@@ -14,7 +14,8 @@ Modelo de predicción de marcadores exactos para la Copa Mundial FIFA 2026 (USA/
 - **Host advantage**: México +20%, USA +13%, Canadá +10% (sobre 16 sedes)
 - **Altitud**: ×1.12 (≥1800m) / ×1.06 (≥1000m) / ×1.02 (≥500m)
 - **Exponentes ELO**: calibrados por grid search sobre 19 amistosos pre-Mundial + 12 cuotas de mercado
-- **Regla de decisión del marcador**: el marcador predicho es el más probable condicionado al resultado más probable (victoria local, empate o victoria visitante). Si el resultado dominante es victoria local, se reporta el marcador más probable entre los marcadores con GH > GA — y así sucesivamente. Esto evita el sesgo modal a 1-1 que producía seleccionar el modo crudo de la distribución conjunta.
+- **Regla de decisión del marcador (v3.3)**: el marcador apostado maximiza el valor esperado de puntos según el reglamento de la polla (6 pts exacto / 4 pts ganador + goles de un equipo / 3 pts ganador o empate no exacto / 1 pt goles de un equipo con ganador incorrecto), calculado sobre la matriz Dixon-Coles 0..6 (`polla_points.py`). En eliminatorias la apuesta incluye quién avanza (9/6/6/3 en empates), por lo que en cruces parejos el óptimo suele ser empate + ganador de penales.
+- **Overrides manuales**: `override.py` permite fijar a mano la apuesta de cualquier partido; el cambio cascadea a la tabla del grupo, el ranking de terceros y el bracket completo. No altera las probabilidades del modelo (Monte Carlo intacto).
 - **Fase eliminatoria**: λ × 0.90 (partidos más cerrados). Prórroga: λ × 1/3 (30 min de 90). Penales: 76% conversión. Bracket R32 derivado dinámicamente del escenario determinista de grupos.
 
 ## Rendimiento (v3.1 — validado 9 jun 2026)
@@ -36,6 +37,10 @@ polla/
 │   ├── predictor_v3.py      # Motor principal (usar este)
 │   ├── setup_db.py          # Inicializa SQLite con 48 equipos + 72 fixtures + datos cualitativos
 │   ├── simulate_knockout.py # Bracket eliminatorio R32→Final (clasificados dinámicos)
+│   ├── polla_points.py      # Reglamento de la polla + apuesta óptima por valor esperado
+│   ├── overrides.py         # Overrides manuales (datos en modelo/data/overrides.json)
+│   ├── override.py          # CLI de overrides: set / set-ko / list / clear
+│   ├── report_md.py         # Regenera las tablas de ESTADO_PROYECTO.md
 │   ├── update_all_teams.py  # Re-aplica ELO/forma/notas (idempotente, ya no obligatorio)
 │   ├── update_team.py       # CLI para actualizar un equipo individual
 │   └── dashboard.py         # Genera el dashboard HTML

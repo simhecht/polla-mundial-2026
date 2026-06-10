@@ -1,8 +1,9 @@
-# TODO — Observaciones pendientes (post-corrección v3.2, 10 jun 2026)
+# TODO — Observaciones pendientes (post-v3.3, 10 jun 2026)
 
 Pendientes que quedaron del levantamiento y de las correcciones del 9-10 de junio.
 Lo estructural (Dixon-Coles completo, MC consistente, bracket dinámico, sedes en KO,
-datos unificados, capa de decisión) ya está resuelto y verificado.
+datos unificados, capa de decisión EV con reglamento real, overrides manuales) ya
+está resuelto y verificado.
 
 ## Alta prioridad — afectan la calidad de la predicción
 
@@ -13,11 +14,13 @@ datos unificados, capa de decisión) ya está resuelto y verificado.
   con miles de partidos + ELO histórico), optimizando log-loss o RPS, con conjunto de
   test separado. Re-reportar métricas honestas.
 
-- [ ] **Adaptar la capa de decisión al esquema de puntos real de la polla.** Hoy el
-  marcador apostado es "el más probable condicionado al resultado más probable"
-  (default defendible). Si la polla pondera distinto (ej. X pts marcador exacto,
-  Y pts resultado), el marcador óptimo es `argmax(X·P(marcador) + Y·P(resultado))`.
-  Falta conocer el reglamento de la polla para implementarlo.
+- [x] **Adaptar la capa de decisión al esquema de puntos real de la polla.** ✅ v3.3
+  (10 jun): reglamento implementado en `polla_points.py` (6/4/3/1 en grupos; 9/6/6/3
+  con advancer en KO); `predict_match` y `predict_ko_match` apuestan
+  `argmax E[puntos]`. Derivado nuevo a validar: en cruces KO parejos el óptimo es
+  apostar empate + ganador de penales (8 de 31 cruces en el bracket actual) — esa
+  apuesta depende de que P(empate 90') del modelo esté bien calibrada (ver
+  recalibración arriba).
 
 - [ ] **Propagar la incertidumbre de grupos al bracket.** Las probabilidades de campeón
   (Argentina 14.5%) condicionan sobre UN solo bracket (el del escenario determinista).
@@ -65,5 +68,5 @@ datos unificados, capa de decisión) ya está resuelto y verificado.
   resultados simulados de rondas previas. Para una polla entregada de antemano es
   aceptable; si se permite re-pronosticar ronda a ronda, agregar actualización ELO.
 
-- [ ] **Commitear v3.2:** los 14 archivos corregidos están en el working tree sin
-  commitear, pendiente de revisión del dashboard.
+- [x] **Commitear v3.2:** ✅ commiteado (4b656fe, 8934192). Pendiente nuevo: commitear
+  v3.3 (capa de decisión EV + overrides + dashboard + docs).

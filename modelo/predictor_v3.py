@@ -20,6 +20,10 @@ import os
 from itertools import product
 import numpy as np
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from polla_points import best_bet_group, expected_points_group
+from overrides import group_override
+
 # ---------------------------------------------------------------------------
 # Configuración global
 # ---------------------------------------------------------------------------
@@ -38,11 +42,6 @@ AVG_ELO = 1600
 # Form factor: ±25% máximo desde la media (5.0)
 # form=3 → ×0.90, form=5 → ×1.00, form=9 → ×1.20
 FORM_CAP = 0.25   # 0.05 por punto de desviación respecto a 5.0 (rango ±25% total)
-
-# v3.2: selección de marcador result-first
-# Si la diferencia entre prob_local y prob_visitante < este umbral,
-# el partido se trata como empate (demasiado equilibrado para distinguir ganador).
-RESULT_MARGIN_PP = 5.0
 
 # ---------------------------------------------------------------------------
 # Ventaja de local para las tres naciones anfitrionas
@@ -326,44 +325,22 @@ def score_matrix_dc(lambda_home, lambda_away, max_goals=6, rho=DIXON_COLES_RHO):
     return matrix
 
 
-def best_score_result_first(matrix):
-    """
-    Elige el marcador dentro del resultado dominante (v3.2).
-
-    Pasos:
-    1. Calcula prob acumulada: victoria local, empate, victoria visitante.
-    2. Determina el resultado dominante (mayor prob acumulada).
-    3. Si local o visitante es dominante pero la diferencia entre ambas prob de
-       victoria es menor a RESULT_MARGIN_PP puntos porcentuales, se trata como
-       empate (partido demasiado equilibrado para elegir ganador).
-    4. Retorna el marcador individual de mayor probabilidad dentro de esa categoría.
-    """
-    prob_h = sum(p for (gh, ga), p in matrix.items() if gh > ga)
-    prob_d = sum(p for (gh, ga), p in matrix.items() if gh == ga)
-    prob_a = sum(p for (gh, ga), p in matrix.items() if gh < ga)
-
-    dominant = max(
-        [('home', prob_h), ('draw', prob_d), ('away', prob_a)],
-        key=lambda x: x[1]
-    )[0]
-
-    if dominant in ('home', 'away'):
-        if abs(prob_h - prob_a) * 100 < RESULT_MARGIN_PP:
-            dominant = 'draw'
-
-    if dominant == 'home':
-        candidates = {s: p for s, p in matrix.items() if s[0] > s[1]}
-    elif dominant == 'draw':
-        candidates = {s: p for s, p in matrix.items() if s[0] == s[1]}
-    else:
-        candidates = {s: p for s, p in matrix.items() if s[0] < s[1]}
-
-    return max(candidates, key=candidates.get)
-
 # ---------------------------------------------------------------------------
 # Predicción de partido
 # ---------------------------------------------------------------------------
-def predict_match(name_home, name_away, conn=None, verbose=True, venue=None):
+def predict_match(name_home, name_away, conn=None, verbose=True, venue=None,
+                  override=None):
+    """
+    Predicción determinista de un partido de grupos.
+
+    Regla de decisión (v3.3): la apuesta es el marcador que MAXIMIZA los
+    puntos esperados de la polla — argmax de E[puntos polla] sobre la grilla
+    0..6 (best_bet_group de polla_points), NO el marcador modal.
+
+    override : tuple (gh, ga) opcional — fija manualmente el marcador apostado.
+               El EV se recalcula para ese marcador (expected_points_group) y
+               el resultado se marca con "manual": True.
+    """
     close_conn = False
     if conn is None:
         conn = sqlite3.connect(DB_PATH); close_conn = True
@@ -387,20 +364,16 @@ def predict_match(name_home, name_away, conn=None, verbose=True, venue=None):
     top5 = sorted(matrix.items(), key=lambda x: -x[1])[:5]
     top3 = top5[:3]
 
-    # best_score: marcador más probable CONDICIONADO al resultado más probable.
-    # Si P(victoria local) es máximo → el marcador modal entre gh>ga.
-    # Si P(empate) es máximo → el marcador modal entre gh==ga.
-    # Si P(victoria visitante) es máximo → el marcador modal entre gh<ga.
+    # best_score (v3.3): apuesta que MAXIMIZA E[puntos polla] sobre la grilla
+    # 0..6 (argmax de expected_points_group), no el marcador modal.
     # top3_scores y top5_scores siguen siendo los modos crudos (informativos).
-    probs = {"home": prob_home, "draw": prob_draw, "away": prob_away}
-    dominant = max(probs, key=probs.__getitem__)
-    if dominant == "home":
-        cond_items = [(s, p) for (s, p) in matrix.items() if s[0] > s[1]]
-    elif dominant == "draw":
-        cond_items = [(s, p) for (s, p) in matrix.items() if s[0] == s[1]]
-    else:
-        cond_items = [(s, p) for (s, p) in matrix.items() if s[0] < s[1]]
-    best_score = max(cond_items, key=lambda x: x[1])[0] if cond_items else top3[0][0]
+    best_score, exp_pts = best_bet_group(matrix)
+
+    # Override manual: fija el marcador apostado y recalcula su EV real.
+    manual = override is not None
+    if manual:
+        best_score = (int(override[0]), int(override[1]))
+        exp_pts = expected_points_group(matrix, best_score)
 
     elo_diff = abs(th["elo_rating"] - ta["elo_rating"])
     confidence = "alta" if elo_diff > 250 else "media" if elo_diff > 100 else "baja"
@@ -412,6 +385,8 @@ def predict_match(name_home, name_away, conn=None, verbose=True, venue=None):
         "elo_home": th["elo_rating"], "elo_away": ta["elo_rating"],
         "lambda_home": round(lh, 3), "lambda_away": round(la, 3),
         "best_score": best_score,
+        "exp_pts": round(exp_pts, 2),
+        "manual": manual,
         "prob_home_win": round(prob_home * 100, 1),
         "prob_draw":     round(prob_draw * 100, 1),
         "prob_away_win": round(prob_away * 100, 1),
@@ -441,7 +416,8 @@ def predict_match(name_home, name_away, conn=None, verbose=True, venue=None):
         print(f"  Sede: {result['venue']} ({alt}m, ×{alt_m:.2f}){host_info}")
         print(f"  Estilos: {result['style_home']} vs {result['style_away']}")
         print(f"  λ local={result['lambda_home']} | λ visit={result['lambda_away']}")
-        print(f"  Marcador: {best_score[0]}-{best_score[1]}")
+        manual_tag = " [MANUAL]" if manual else ""
+        print(f"  Marcador: {best_score[0]}-{best_score[1]} | EV polla: {result['exp_pts']:.2f} pts{manual_tag}")
         print(f"  L:{result['prob_home_win']}% E:{result['prob_draw']}% V:{result['prob_away_win']}%")
         print(f"  Top 3: {[(f'{s[0]}-{s[1]}', f'{p}%') for s,p in result['top3_scores']]}")
         print(f"  Confianza ELO: {confidence}")
@@ -549,7 +525,11 @@ def simulate_group(group_name, conn=None, verbose=True):
 
     results = []
     for home_name, away_name in fixtures:
-        r = predict_match(home_name, away_name, conn=conn, verbose=False)
+        # Override manual (overrides.json): fija el marcador del escenario
+        # determinista → cascadea a standings, terceros y bracket (build_r32).
+        ov = group_override(home_name, away_name)
+        r = predict_match(home_name, away_name, conn=conn, verbose=False,
+                          override=ov)
         gh, ga = r["best_score"]
         results.append({
             "home": r["home"], "away": r["away"],
@@ -558,6 +538,8 @@ def simulate_group(group_name, conn=None, verbose=True):
             "prob_d": r["prob_draw"],
             "prob_a": r["prob_away_win"],
             "top3":   r["top3_scores"],
+            "exp_pts": r["exp_pts"],
+            "manual":  r["manual"],
         })
         sh, sa = standings[home_name], standings[away_name]
         sh["gf"] += gh; sh["ga"] += ga
@@ -573,8 +555,10 @@ def simulate_group(group_name, conn=None, verbose=True):
         print(f"\n{'='*62}")
         print(f"  GRUPO {group_name} — PARTIDOS (predictor v3)")
         for r in results:
+            tag = " [manual]" if r["manual"] else ""
             print(f"  {r['home']:22s} {r['score']:5s} {r['away']:22s}"
-                  f"  ({r['prob_h']}%/{r['prob_d']}%/{r['prob_a']}%)")
+                  f"  ({r['prob_h']}%/{r['prob_d']}%/{r['prob_a']}%)"
+                  f"  EV={r['exp_pts']:.2f}{tag}")
         print(f"\n  {'Equipo':<24} {'G':>2} {'E':>2} {'P':>2} {'GF':>3} {'GC':>3} {'DG':>4} {'PTS':>4}")
         for i, t in enumerate(sorted_teams):
             m = "  Q" if i < 2 else "   "

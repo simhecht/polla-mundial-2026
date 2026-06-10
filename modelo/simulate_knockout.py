@@ -27,8 +27,12 @@ Cambios v3.2:
   5. ET_FACTOR = 1/3 (prórroga = 30 de 90 minutos; antes 0.50, erróneo).
   6. Monte Carlo muestrea desde score_matrix_dc (Dixon-Coles) en 90' y
      prórroga, consistente con el motor analítico. Penales: 76% conversión.
-  7. predict_ko_match usa la misma regla de decisión que predict_match:
-     marcador más probable CONDICIONADO al resultado más probable.
+  7. predict_ko_match (v3.3) elige la apuesta (marcador 90' + advancer) que
+     MAXIMIZA los puntos esperados de la polla (best_bet_ko). P(avanza local |
+     empate) se calcula con la matriz de prórroga (λ × ET_FACTOR); los penales
+     del modelo son simétricos → 0.5 del empate en prórroga.
+  8. Overrides manuales (overrides.py): fijan marcador/advancer del escenario
+     determinista; el Monte Carlo NO se toca (probabilidades del modelo).
 
 λ × 0.90 para todos los partidos eliminatorios.
 """
@@ -42,6 +46,8 @@ from predictor_v3 import (
     get_team, compute_lambdas, score_matrix_dc, simulate_group,
     DB_PATH, regenerate_db
 )
+from polla_points import best_bet_ko, expected_points_ko
+from overrides import ko_override
 
 # ---------------------------------------------------------------------------
 # Parámetros
@@ -220,10 +226,14 @@ def _load_teams(conn, r32):
 def predict_ko_match(th, ta, factor=KO_FACTOR, venue=None):
     """Predicción determinista para partido eliminatorio. Retorna dict con winner.
     Sede del partido → host advantage + altitud activos en eliminatoria.
-    Regla de decisión (igual que predict_match): marcador más probable
-    CONDICIONADO al resultado más probable. Si el resultado dominante es
-    empate, se reporta el marcador de empate (went_et) y el ganador se
-    resuelve por comparación de P(win)."""
+    Regla de decisión (v3.3): apuesta (marcador 90' + advancer) que MAXIMIZA
+    los puntos esperados de la polla (best_bet_ko sobre la grilla 0..6).
+    P(avanza local | empate en 90') se calcula con la matriz de prórroga
+    (λ × ET_FACTOR); los penales del modelo son simétricos (76% conversión
+    ambos lados) → cuentan 0.5 del empate en prórroga.
+    Override manual (overrides.ko_override): fija marcador/advancer del
+    escenario determinista y el EV se recalcula para la apuesta forzada;
+    las probabilidades siguen siendo del modelo."""
     lh, la = compute_lambdas(th, ta, venue=venue)
     lh *= factor
     la *= factor
@@ -233,19 +243,34 @@ def predict_ko_match(th, ta, factor=KO_FACTOR, venue=None):
     prob_d = sum(p for (gh, ga), p in matrix.items() if gh == ga)
     prob_a = sum(p for (gh, ga), p in matrix.items() if gh < ga)
 
-    probs = {"home": prob_h, "draw": prob_d, "away": prob_a}
-    dominant = max(probs, key=probs.__getitem__)
-    if dominant == "home":
-        cond = [(s, p) for s, p in matrix.items() if s[0] > s[1]]
-    elif dominant == "draw":
-        cond = [(s, p) for s, p in matrix.items() if s[0] == s[1]]
-    else:
-        cond = [(s, p) for s, p in matrix.items() if s[0] < s[1]]
-    best = max(cond, key=lambda x: x[1])[0]
+    # P(local avanza | empate en 90'): prórroga Dixon-Coles + penales simétricos
+    met = score_matrix_dc(lh * ET_FACTOR, la * ET_FACTOR)
+    p_et_h = sum(p for (gh, ga), p in met.items() if gh > ga)
+    p_et_d = sum(p for (gh, ga), p in met.items() if gh == ga)
+    p_home_adv_draw = p_et_h + 0.5 * p_et_d
 
-    # En eliminatoria empate → prórroga/penales; el favorito (mayor P(win)) avanza
+    best, adv_side, exp_pts = best_bet_ko(matrix, p_home_adv_draw)
+
+    # Override manual: fija la apuesta y recalcula su EV real
+    ov = ko_override(th["name"], ta["name"])
+    manual = ov is not None
+    if manual:
+        best = ov["score"]
+        if best[0] == best[1]:
+            if ov["advancer"] == th["name"]:
+                adv_side = "home"
+            elif ov["advancer"] == ta["name"]:
+                adv_side = "away"
+            else:
+                # Empate sin advancer en el override → favorito por prórroga
+                adv_side = "home" if p_home_adv_draw >= 0.5 else "away"
+        else:
+            adv_side = "home" if best[0] > best[1] else "away"
+        exp_pts = expected_points_ko(matrix, p_home_adv_draw, best, adv_side)
+
+    # Si la apuesta es empate, el advancer define quién avanza (prórroga/penales)
     if best[0] == best[1]:
-        winner, went_et = (th if prob_h >= prob_a else ta), True
+        winner, went_et = (th if adv_side == "home" else ta), True
     else:
         winner, went_et = (th if best[0] > best[1] else ta), False
 
@@ -256,7 +281,11 @@ def predict_ko_match(th, ta, factor=KO_FACTOR, venue=None):
         "prob_h": round(prob_h*100,1),
         "prob_d": round(prob_d*100,1),
         "prob_a": round(prob_a*100,1),
+        "p_adv_home_draw": round(p_home_adv_draw*100, 1),
+        "exp_pts": round(exp_pts, 2),
         "winner": winner,
+        "advancer": winner["name"],
+        "manual": manual,
         "venue": venue,
         "elo_diff": abs(th["elo_rating"] - ta["elo_rating"]),
     }
@@ -333,12 +362,15 @@ def bracket_deterministic(conn, r32=None):
     for home_name, away_name, label, venue in r32:
         r = predict_ko_match(teams[home_name], teams[away_name], venue=venue)
         gh, ga = r["score"]
-        suffix = "(ET)" if r["went_et"] else ""
         h_es = name_es(r["home"])
         a_es = name_es(r["away"])
         w_es = name_es(r["winner"])
+        # Empate en 90' → avanza por prórroga/penales: el sufijo lo deja claro
+        suffix = f" (pen: {w_es})" if r["went_et"] else ""
+        manual_tag = " [manual]" if r["manual"] else ""
         print(f"  [{label:28s}] {venue:<17} {h_es:18} {gh}-{ga}{suffix} {a_es:18}  "
-              f"{r['prob_h']}%/{r['prob_d']}%/{r['prob_a']}%  → {w_es}")
+              f"{r['prob_h']}%/{r['prob_d']}%/{r['prob_a']}%  EV={r['exp_pts']:.2f}"
+              f"  → {w_es}{manual_tag}")
         r32_winners.append(r["winner"]["name"])
 
     # R16 → Final
@@ -352,12 +384,14 @@ def bracket_deterministic(conn, r32=None):
             venue = ROUND_VENUES[round_key][i]
             r = predict_ko_match(teams[hn], teams[an], venue=venue)
             gh, ga = r["score"]
-            suffix = "(ET)" if r["went_et"] else ""
             h_es = name_es(r["home"])
             a_es = name_es(r["away"])
             w_es = name_es(r["winner"])
+            suffix = f" (pen: {w_es})" if r["went_et"] else ""
+            manual_tag = " [manual]" if r["manual"] else ""
             print(f"  {venue:<17} {h_es:20} {gh}-{ga}{suffix}  {a_es:20}  "
-                  f"{r['prob_h']}%/{r['prob_d']}%/{r['prob_a']}%  → {w_es}")
+                  f"{r['prob_h']}%/{r['prob_d']}%/{r['prob_a']}%  EV={r['exp_pts']:.2f}"
+                  f"  → {w_es}{manual_tag}")
             next_round.append(r["winner"]["name"])
         current = next_round
 
@@ -429,6 +463,9 @@ def get_bracket_data(conn, n_sims=N_SIMS_MC):
             "score": f"{gh}-{ga}", "went_et": r["went_et"],
             "prob_h": r["prob_h"], "prob_d": r["prob_d"], "prob_a": r["prob_a"],
             "winner": winner_name, "winner_es": name_es(r["winner"]),
+            "exp_pts": r["exp_pts"],
+            "advancer": r["advancer"], "advancer_es": name_es(r["winner"]),
+            "manual": r["manual"],
             "match_num": idx + 1,
             "label": label, "venue": venue,
         })
@@ -449,6 +486,9 @@ def get_bracket_data(conn, n_sims=N_SIMS_MC):
                 "score": f"{gh}-{ga}", "went_et": r["went_et"],
                 "prob_h": r["prob_h"], "prob_d": r["prob_d"], "prob_a": r["prob_a"],
                 "winner": winner_name, "winner_es": name_es(r["winner"]),
+                "exp_pts": r["exp_pts"],
+                "advancer": r["advancer"], "advancer_es": name_es(r["winner"]),
+                "manual": r["manual"],
                 "venue": venue,
             })
             next_round.append(winner_name)

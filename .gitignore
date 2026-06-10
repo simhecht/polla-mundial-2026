@@ -4,3 +4,6 @@ __pycache__/
 *.pyd
 .DS_Store
 *.db-journal
+
+# Base de datos regenerable (setup_db.py la reconstruye; datos externos crudos van en modelo/data/raw/)
+modelo/data/mundial_2026.db

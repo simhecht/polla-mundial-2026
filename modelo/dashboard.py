@@ -42,7 +42,7 @@ def build_html(groups_data, bracket_data):
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Polla Mundial 2026 — Predicciones v3.2</title>
+<title>Polla Mundial 2026 — Predicciones v3.3</title>
 <style>
 :root {{
   --bg:#0f172a;--card:#1e293b;--border:#334155;
@@ -132,12 +132,17 @@ footer{{text-align:center;padding:2rem;color:var(--muted);font-size:.8rem;border
 .ko-score{{text-align:center;font-size:.65rem;color:var(--muted);padding:1px 4px}}
 .ko-score span{{color:var(--accent);font-weight:700}}
 .connector-right{{position:absolute;right:-1px;width:8px;border-top:1px solid var(--muted);top:50%}}
+.ev-badge{{display:inline-block;font-size:.65rem;color:var(--green);font-weight:600;margin-left:.3rem;opacity:.85}}
+.match-manual{{border-left:3px solid var(--accent)!important;background:rgba(245,158,11,.06)}}
+.manual-icon{{font-size:.72rem;margin-left:.3rem;cursor:help}}
+.ko-manual{{border:1px solid var(--accent)!important;background:rgba(245,158,11,.07)}}
+.ko-ev{{font-size:.62rem;color:var(--green);font-weight:600;margin-left:.25rem}}
 </style>
 </head>
 <body>
 <header>
   <h1>⚽ POLLA MUNDIAL 2026</h1>
-  <p>Modelo v3.2 · Poisson + Dixon-Coles (ρ=−0.10) · ELO^2.8/2.1 · Resultado dominante → marcador · Calibrado 9 jun 2026</p>
+  <p>Modelo v3.3 — apuesta por valor esperado + overrides · Poisson + Dixon-Coles (ρ=−0.10) · ELO^2.8/2.1 · Calibrado 9 jun 2026</p>
 </header>
 
 <div class="container">
@@ -150,15 +155,23 @@ footer{{text-align:center;padding:2rem;color:var(--muted);font-size:.8rem;border
   <!-- ────── TAB GRUPOS ────── -->
   <div id="grupos" class="tab-content active">
     <div class="model-info">
-      <strong>Modelo v3.2:</strong> ELO exponente 2.8/2.1 (calibrado 9 jun 2026 · 19 amistosos + 12 cuotas mercado) ·
+      <strong>Modelo v3.3:</strong> ELO exponente 2.8/2.1 (calibrado 9 jun 2026 · 19 amistosos + 12 cuotas mercado) ·
       Forma ±25% cap · Ventaja local: 🇲🇽 +20% / 🇺🇸 +13% / 🇨🇦 +10% ·
-      Dixon-Coles ρ=−0.10 · Marcador: resultado dominante → mejor marcador en esa categoría (margen ≥5pp) ·
+      Dixon-Coles ρ=−0.10 · Marcador: apuesta que <strong>maximiza puntos esperados</strong> según reglamento polla ·
       <strong>%Clasif</strong> = Monte Carlo 20,000 simulaciones · Validación: 79% dir · 74% top-3 · 42% exacto
     </div>
     <div class="legend">
       <div class="legend-item"><div class="legend-box" style="background:rgba(16,185,129,.4)"></div> Clasifican directo (1° y 2°)</div>
       <div class="legend-item"><div class="legend-box" style="background:rgba(245,158,11,.3)"></div> Posible mejor 3°</div>
       <div class="legend-item">🏠 = Ventaja de local anfitrión</div>
+    </div>
+    <div class="model-info" style="font-size:.8rem;margin-bottom:1rem">
+      <strong>Nota sobre los marcadores:</strong> El marcador mostrado en cada partido <em>no es necesariamente el más probable</em>,
+      sino la apuesta que <strong>maximiza los puntos esperados</strong> según el reglamento de la polla
+      (6 pts exacto · 4 pts ganador + goles de un equipo · 3 pts ganador · 1 pt goles de un equipo).
+      <strong>EV</strong> = puntos esperados de esa apuesta ·
+      <strong>✏️</strong> = marcador fijado manualmente por el usuario ·
+      <strong>(pen: X)</strong> = empate en 90' y el equipo X avanza por prórroga o penales.
     </div>
     <div class="groups-grid" id="groupsContainer"></div>
   </div>
@@ -169,12 +182,14 @@ footer{{text-align:center;padding:2rem;color:var(--muted);font-size:.8rem;border
     <div id="championCard" class="champion-card"></div>
 
     <div class="bracket-note">
-      <strong>Empates en eliminatoria:</strong>
-      90 min → Prórroga (λ×0.45, 30 min) → Penales muerte súbita (76% conversión por tiro) ·
-      Determinista: gana el equipo con mayor probabilidad de victoria (proxy de favoritismo en prórroga) ·
-      <strong>MC:</strong> se simula el resultado completo incluyendo penales
+      <strong>Marcadores en bracket:</strong> La apuesta mostrada (marcador 90' + quién avanza) <em>maximiza los puntos esperados</em>
+      según el reglamento de la polla (9 pts exacto · 6 pts ganador + goles · 6 pts acertó quién avanza · 3 pts goles de un equipo en empates).
+      <strong>EV</strong> = puntos esperados de esa apuesta ·
+      <strong>✏️</strong> = marcador fijado manualmente ·
+      <strong>(pen: X)</strong> = empate en 90' y X avanza por prórroga/penales.
       <br>
-      <strong>Bracket:</strong> fixture oficial FIFA 2026 · Annex C aplicado para combinación de 3eros B,C,D,E,F,G,I,L ·
+      <strong>Simulación:</strong> 90 min → Prórroga (λ×0.45, 30 min) → Penales muerte súbita (76% conversión) ·
+      <strong>Bracket:</strong> fixture oficial FIFA 2026 · Annex C (3eros B,C,D,E,F,G,I,L) ·
       Colores por sección: <span style="color:var(--blue)">■ A→QF1</span>
       <span style="color:var(--green)"> ■ B→QF2</span>
       <span style="color:var(--host)"> ■ C→QF3</span>
@@ -189,7 +204,7 @@ footer{{text-align:center;padding:2rem;color:var(--muted);font-size:.8rem;border
   <!-- ────── TAB INFO ────── -->
   <div id="info" class="tab-content">
     <div style="max-width:700px;line-height:1.75;color:var(--muted)">
-      <h3 style="color:var(--text);margin-bottom:1rem">Metodología v3.1</h3>
+      <h3 style="color:var(--text);margin-bottom:1rem">Metodología v3.3</h3>
       <p><strong style="color:var(--accent)">Base ELO:</strong> Fuerza relativa de cada selección.
       Exponentes ataque/defensa = 2.8/2.1 (calibrados el 9 jun 2026 por grid search sobre 19
       amistosos + 12 cuotas de mercado). Curazao tiene λ≈0.52 vs Alemania.</p><br>
@@ -202,17 +217,17 @@ footer{{text-align:center;padding:2rem;color:var(--muted);font-size:.8rem;border
       fútbol internacional. Ajusta la probabilidad de marcadores bajos (0-0, 1-0, 0-1).</p><br>
       <p><strong style="color:var(--accent)">Monte Carlo 20,000 iter.:</strong> % de clasificación
       real, no solo el marcador modal. Empates en eliminatoria se resuelven con prórroga y penales.</p><br>
-      <p><strong style="color:var(--accent)">Selección de marcador (v3.2):</strong> En vez del marcador
-      individual más probable (que tiende al 1-1 en duelos equilibrados), el modelo elige primero el
-      <em>resultado dominante</em> (victoria local/empate/visita por prob. acumulada). Si la diferencia
-      entre prob. local y visitante es menor a 5pp, el partido se trata como empate. Luego se elige el
-      mejor marcador dentro de esa categoría. Esto alinea los pronósticos con el histórico mundialista:
-      ~15% de 1-1 en eliminatorias (1990–2022), no el 84% que generaba v3.1.</p>
+      <p><strong style="color:var(--accent)">Selección de marcador (v3.3 — apuesta por valor esperado):</strong>
+      El modelo elige el marcador (y en KO el quién avanza) que <em>maximiza los puntos esperados</em>
+      según el reglamento de la polla: grupos → 6 exacto / 4 ganador+goles / 3 ganador / 1 goles de un equipo;
+      eliminatoria → 9/6/6/3 con empates. Esto reemplaza la heurística del "resultado dominante" de v3.2.
+      El EV mostrado refleja cuántos puntos se esperan ganar en promedio con esa apuesta.
+      Overrides manuales permiten fijar cualquier marcador (indicados con ✏️).</p>
     </div>
   </div>
 </div>
 
-<footer>Polla Mundial 2026 · Predictor v3.2 · Calibrado 9 jun 2026 · Monte Carlo 20k sims · Result-first scoring</footer>
+<footer>Polla Mundial 2026 · Predictor v3.3 — apuesta por valor esperado + overrides · Calibrado 9 jun 2026 · Monte Carlo 20k sims</footer>
 
 <script>
 const GROUPS_DATA = {gj};
@@ -252,15 +267,21 @@ function renderGroups() {{
         <td class="${{mcCls}}">${{mc}}%</td>
       </tr>`;
     }}).join('');
-    const matchRows = group.results.map(r => `
-      <div class="match-row">
+    const matchRows = group.results.map(r => {{
+      const manualClass = r.manual ? ' match-manual' : '';
+      const manualIcon  = r.manual ? `<span class="manual-icon" title="Resultado fijado manualmente">✏️</span>` : '';
+      const evBadge     = r.exp_pts != null ? `<span class="ev-badge">EV ${{r.exp_pts.toFixed(1)}}</span>` : '';
+      return `
+      <div class="match-row${{manualClass}}">
         <div class="match-teams">
           <span class="match-home">${{r.home}}</span>
-          <span class="match-score">${{r.score}}</span>
+          <span class="match-score">${{r.score}}${{evBadge}}</span>
           <span class="match-away">${{r.away}}</span>
         </div>
         <span class="match-meta">${{r.prob_h}}·${{r.prob_d}}·${{r.prob_a}}${{r.host_team?`<span style="color:var(--host)"> 🏠${{r.host_team}}</span>`:''}}</span>
-      </div>`).join('');
+        ${{manualIcon}}
+      </div>`;
+    }}).join('');
     card.innerHTML = `
       <div class="group-header">
         <span class="group-letter">${{group.group}}</span>
@@ -363,7 +384,14 @@ function renderBracket() {{
 
       const hw = m.winner === m.home;
       const aw = m.winner === m.away;
-      const scoreDisp = m.went_et ? `${{m.score}} <span style="color:var(--muted);font-weight:400">(ET/Pen)</span>` : `<span>${{m.score}}</span>`;
+      const scoreDisp = m.went_et
+        ? `<span>${{m.score}}</span> <span style="color:var(--muted);font-weight:400">(pen: ${{m.advancer_es}})</span>`
+        : `<span>${{m.score}}</span>`;
+      const evDisp    = m.exp_pts != null ? `<span class="ko-ev">EV ${{m.exp_pts.toFixed(1)}}</span>` : '';
+      const manualCls = m.manual ? ' ko-manual' : '';
+      const manualIcon = m.manual ? ` <span title="Resultado fijado manualmente" style="font-size:.65rem">✏️</span>` : '';
+
+      card.className += manualCls;
 
       card.innerHTML = `
         <div class="ko-team ${{hw?'winner':''}}">
@@ -377,9 +405,9 @@ function renderBracket() {{
           <span class="ko-name">${{m.away_es}}</span>
           <span class="ko-pct">${{m.prob_a}}%</span>
         </div>
-        <div class="ko-score">${{scoreDisp}} <span style="color:var(--muted)">·</span> E${{m.prob_d}}%</div>`;
+        <div class="ko-score">${{scoreDisp}}${{evDisp}}${{manualIcon}} <span style="color:var(--muted)">·</span> E${{m.prob_d}}%</div>`;
 
-      card.title = `${{m.home_es}} vs ${{m.away_es}} | ${{m.score}}${{m.went_et?' (ET/Pen)':''}} | L:${{m.prob_h}}% E:${{m.prob_d}}% V:${{m.prob_a}}%`;
+      card.title = `${{m.home_es}} vs ${{m.away_es}} | ${{m.score}}${{m.went_et?` (pen: ${{m.advancer_es}})`:''}} | L:${{m.prob_h}}% E:${{m.prob_d}}% V:${{m.prob_a}}%${{m.manual?' | ✏️ Manual':''}} | EV ${{m.exp_pts}}`;
 
       body.appendChild(card);
     }});
