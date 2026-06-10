@@ -32,10 +32,115 @@ FLAG_EMOJIS = {
 }
 HOST_TEAMS = {"Mexico","USA","Canada"}
 
+# ---------------------------------------------------------------------------
+# UI de edición (solo modo interactivo, servida por app.py)
+# ---------------------------------------------------------------------------
+EDIT_CSS = """
+/* ── UI de edición (modo interactivo) ── */
+.edit-bar{position:fixed;top:0;right:0;z-index:1000;display:flex;align-items:center;gap:.7rem;background:rgba(15,23,42,.95);border:1px solid var(--border);border-top:none;border-right:none;border-bottom-left-radius:10px;padding:.4rem .9rem;font-size:.75rem;color:var(--muted);box-shadow:0 2px 8px rgba(0,0,0,.4)}
+.edit-bar button{background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:.2rem .6rem;font-size:.72rem;cursor:pointer}
+.edit-bar button:hover{border-color:var(--accent);color:var(--accent)}
+.edit-bar button:disabled{opacity:.5;cursor:wait}
+.edit-btn{background:none;border:none;cursor:pointer;font-size:.7rem;padding:0 .1rem;opacity:.5;transition:opacity .15s;line-height:1}
+.edit-btn:hover{opacity:1}
+"""
 
-def build_html(groups_data, bracket_data):
+EDIT_JS = r"""
+/* ── Modo interactivo: edición de resultados (servido por app.py) ── */
+const jsq = s => String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+editGroupControls = r => {
+  const edit = `<button class="edit-btn" title="Editar marcador" onclick="editMatch('group','${jsq(r.home_raw)}','${jsq(r.away_raw)}','${jsq(r.home)}','${jsq(r.away)}','${r.score}')">✏️</button>`;
+  const clear = r.manual ? `<button class="edit-btn" title="Borrar este override" onclick="clearMatch('${jsq(r.home_raw)}','${jsq(r.away_raw)}')">🗑️</button>` : '';
+  return edit + clear;
+};
+
+editKoControls = m => {
+  const edit = `<button class="edit-btn" title="Editar marcador" onclick="editMatch('ko','${jsq(m.home)}','${jsq(m.away)}','${jsq(m.home_es)}','${jsq(m.away_es)}','${m.score}')">✏️</button>`;
+  const clear = m.manual ? `<button class="edit-btn" title="Borrar este override" onclick="clearMatch('${jsq(m.home)}','${jsq(m.away)}')">🗑️</button>` : '';
+  return edit + clear;
+};
+
+async function apiPost(path, body) {
+  try {
+    const res = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json'},
+                                   body: JSON.stringify(body)});
+    const data = await res.json();
+    if (!data.ok) { alert('Error: ' + (data.error || 'desconocido')); return null; }
+    return data;
+  } catch (e) {
+    alert('Error de conexión con el servidor local: ' + e);
+    return null;
+  }
+}
+
+function parseScore(txt) {
+  if (txt == null) return null;            // cancelado
+  const m = txt.trim().match(/^(\d+)\s*[-:]\s*(\d+)$/);
+  if (!m) { alert('Formato inválido. Usa por ejemplo: 2-1'); return null; }
+  return [parseInt(m[1], 10), parseInt(m[2], 10)];
+}
+
+async function editMatch(scope, homeRaw, awayRaw, homeEs, awayEs, current) {
+  const txt = prompt(`Marcador para ${homeEs} vs ${awayEs} (formato 2-1):`, current || '');
+  const sc = parseScore(txt);
+  if (!sc) return;
+  let advancer = null;
+  if (scope === 'ko' && sc[0] === sc[1]) {
+    const a = prompt(`Empate ${sc[0]}-${sc[1]}: ¿quién avanza (prórroga/penales)?\nEscribe "${homeEs}" o "${awayEs}":`);
+    if (a == null) return;
+    const t = a.trim().toLowerCase();
+    if (t === homeEs.toLowerCase() || t === homeRaw.toLowerCase()) advancer = homeRaw;
+    else if (t === awayEs.toLowerCase() || t === awayRaw.toLowerCase()) advancer = awayRaw;
+    else { alert('Equipo no reconocido. Debe ser uno de los dos del partido.'); return; }
+  }
+  const r = await apiPost('/api/override',
+    {scope, home: homeRaw, away: awayRaw, gh: sc[0], ga: sc[1], advancer});
+  if (r) location.reload();
+}
+
+async function clearMatch(homeRaw, awayRaw) {
+  const r = await apiPost('/api/clear', {home: homeRaw, away: awayRaw});
+  if (r) location.reload();
+}
+
+async function clearAllOverrides() {
+  if (!confirm('¿Borrar TODOS los overrides manuales?')) return;
+  const r = await apiPost('/api/clear', {all: true});
+  if (r) location.reload();
+}
+
+async function recalcMC() {
+  const btn = document.getElementById('recalcBtn');
+  btn.disabled = true; btn.textContent = 'Recalculando…';
+  const r = await apiPost('/api/recalc-mc', {});
+  if (r) { location.reload(); return; }
+  btn.disabled = false; btn.textContent = 'Recalcular Monte Carlo';
+}
+
+/* Barra superior fija: contador de overrides + acciones globales */
+(function () {
+  let n = 0;
+  GROUPS_DATA.forEach(g => g.results.forEach(r => { if (r.manual) n++; }));
+  Object.values(BRACKET_DATA.rounds).forEach(ms => ms.forEach(m => { if (m.manual) n++; }));
+  const bar = document.createElement('div');
+  bar.className = 'edit-bar';
+  bar.innerHTML = `<span>✏️ ${n} override${n === 1 ? '' : 's'} activo${n === 1 ? '' : 's'}</span>
+    <button onclick="clearAllOverrides()">Limpiar todos</button>
+    <button id="recalcBtn" onclick="recalcMC()">Recalcular Monte Carlo</button>`;
+  document.body.appendChild(bar);
+})();
+"""
+
+
+def build_html(groups_data, bracket_data, interactive=False):
+    """Genera el HTML del dashboard.
+    interactive=True (app.py) inyecta la UI de edición de resultados;
+    con False (default) el HTML estático queda sin UI de edición."""
     gj = json.dumps(groups_data, ensure_ascii=False)
     bj = json.dumps(bracket_data, ensure_ascii=False)
+    edit_css = EDIT_CSS if interactive else ""
+    edit_js  = EDIT_JS if interactive else ""
 
     return f"""<!DOCTYPE html>
 <html lang="es">
@@ -137,7 +242,7 @@ footer{{text-align:center;padding:2rem;color:var(--muted);font-size:.8rem;border
 .manual-icon{{font-size:.72rem;margin-left:.3rem;cursor:help}}
 .ko-manual{{border:1px solid var(--accent)!important;background:rgba(245,158,11,.07)}}
 .ko-ev{{font-size:.62rem;color:var(--green);font-weight:600;margin-left:.25rem}}
-</style>
+{edit_css}</style>
 </head>
 <body>
 <header>
@@ -238,6 +343,12 @@ const CONF_COLORS = {{"UEFA":"#3b82f6","CONMEBOL":"#10b981","CONCACAF":"#f59e0b"
 
 function getFlag(name) {{ return FLAGS[name] || '🏳'; }}
 
+/* Hooks de edición: no-op en el HTML estático; el modo interactivo
+   (app.py) los redefine más abajo para inyectar los botones ✏️/🗑️. */
+let editGroupControls = r => '';
+let editKoControls = m => '';
+{edit_js}
+
 function showTab(id, el) {{
   document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -279,7 +390,7 @@ function renderGroups() {{
           <span class="match-away">${{r.away}}</span>
         </div>
         <span class="match-meta">${{r.prob_h}}·${{r.prob_d}}·${{r.prob_a}}${{r.host_team?`<span style="color:var(--host)"> 🏠${{r.host_team}}</span>`:''}}</span>
-        ${{manualIcon}}
+        ${{manualIcon}}${{editGroupControls(r)}}
       </div>`;
     }}).join('');
     card.innerHTML = `
@@ -405,7 +516,7 @@ function renderBracket() {{
           <span class="ko-name">${{m.away_es}}</span>
           <span class="ko-pct">${{m.prob_a}}%</span>
         </div>
-        <div class="ko-score">${{scoreDisp}}${{evDisp}}${{manualIcon}} <span style="color:var(--muted)">·</span> E${{m.prob_d}}%</div>`;
+        <div class="ko-score">${{scoreDisp}}${{evDisp}}${{manualIcon}} <span style="color:var(--muted)">·</span> E${{m.prob_d}}%${{editKoControls(m)}}</div>`;
 
       card.title = `${{m.home_es}} vs ${{m.away_es}} | ${{m.score}}${{m.went_et?` (pen: ${{m.advancer_es}})`:''}} | L:${{m.prob_h}}% E:${{m.prob_d}}% V:${{m.prob_a}}%${{m.manual?' | ✏️ Manual':''}} | EV ${{m.exp_pts}}`;
 
@@ -425,19 +536,25 @@ renderBracket();
 </html>"""
 
 
-def generate_dashboard():
-    print("Inicializando DB...")
-    regenerate_db()
-    conn = sqlite3.connect(DB_PATH)
+def collect_groups_data(conn, n_sims=MC_SIMS, group_mc=None, verbose=True):
+    """Recolecta los datos de la fase de grupos (parte determinista + MC).
 
+    group_mc : dict opcional {grupo: finish_counts} con el Monte Carlo de
+               grupos precalculado (cache de app.py — los overrides no afectan
+               el MC, así que es seguro reutilizarlo entre reloads).
+               Si es None, se calcula con simulate_group_mc (n_sims).
+    """
     from predictor_v3 import MATCH_VENUES, HOST_ADVANTAGE
 
-    # ── Fase de grupos ──
     all_groups = []
     for g in GROUPS:
-        print(f"  Grupo {g}...", end=" ", flush=True)
+        if verbose:
+            print(f"  Grupo {g}...", end=" ", flush=True)
         sorted_teams, results = simulate_group(g, conn=conn, verbose=False)
-        finish_counts, _, _   = simulate_group_mc(g, conn, n_sims=MC_SIMS)
+        if group_mc is not None and g in group_mc:
+            finish_counts = group_mc[g]
+        else:
+            finish_counts, _, _ = simulate_group_mc(g, conn, n_sims=n_sims)
         cur = conn.cursor()
         for t in sorted_teams:
             cur.execute("SELECT confederation FROM teams WHERE name=?", (t["name"],))
@@ -446,7 +563,10 @@ def generate_dashboard():
             t["flag"]    = FLAG_EMOJIS.get(t["name"], "🏳")
             t["is_host"] = t["name"] in HOST_TEAMS
             fc = finish_counts.get(t["name"], [0,0,0,0])
-            t["mc_clasif"] = round((fc[0]+fc[1]) / MC_SIMS * 100, 1)
+            # Normalizar por el total real de simulaciones (sum(fc)) para que
+            # funcione con cualquier n_sims del cache de app.py.
+            total_sims = sum(fc) or 1
+            t["mc_clasif"] = round((fc[0]+fc[1]) / total_sims * 100, 1)
         for r in results:
             hn = r.get("home_raw", r["home"])
             an = r.get("away_raw", r["away"])
@@ -457,7 +577,8 @@ def generate_dashboard():
                     if ven in hdata["venues"] and (hn==hname or an==hname):
                         r["host_team"] = hname[:3]
                         break
-        print("✓")
+        if verbose:
+            print("✓")
         all_groups.append({
             "group": g,
             "standings": [{"name_es":t["name_es"],"name":t["name"],"pts":t["pts"],
@@ -467,14 +588,34 @@ def generate_dashboard():
                            "mc_clasif":t.get("mc_clasif",0)} for t in sorted_teams],
             "results": results,
         })
+    return all_groups
 
-    # ── Bracket eliminatorio ──
-    print("  Bracket eliminatorio (MC 20k)...", end=" ", flush=True)
-    bracket = get_bracket_data(conn, n_sims=MC_SIMS)
-    print("✓")
 
+def render_dashboard_html(conn, n_sims=MC_SIMS, mc_odds=None, group_mc=None,
+                          interactive=False, verbose=True):
+    """Recolecta los datos actuales (overrides incluidos) y retorna el HTML.
+
+    mc_odds  : probabilidades de campeón precalculadas (cache de app.py);
+               si es None se corre el Monte Carlo del bracket (caro).
+    group_mc : Monte Carlo de grupos precalculado (ver collect_groups_data).
+    interactive : inyecta la UI de edición (solo app.py).
+    """
+    all_groups = collect_groups_data(conn, n_sims=n_sims, group_mc=group_mc,
+                                     verbose=verbose)
+    if verbose:
+        print(f"  Bracket eliminatorio...", end=" ", flush=True)
+    bracket = get_bracket_data(conn, n_sims=n_sims, mc_odds=mc_odds)
+    if verbose:
+        print("✓")
+    return build_html(all_groups, bracket, interactive=interactive)
+
+
+def generate_dashboard():
+    print("Inicializando DB...")
+    regenerate_db()
+    conn = sqlite3.connect(DB_PATH)
+    html = render_dashboard_html(conn, n_sims=MC_SIMS, verbose=True)
     conn.close()
-    html = build_html(all_groups, bracket)
     with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
         f.write(html)
     print(f"\n✅ Dashboard generado: {OUTPUT_PATH}")

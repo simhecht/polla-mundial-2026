@@ -533,6 +533,9 @@ def simulate_group(group_name, conn=None, verbose=True):
         gh, ga = r["best_score"]
         results.append({
             "home": r["home"], "away": r["away"],
+            # Nombres raw (columna `name` de la DB) — necesarios para que la
+            # UI interactiva (app.py) pueda fijar overrides por par exacto.
+            "home_raw": r["home_raw"], "away_raw": r["away_raw"],
             "score": f"{gh}-{ga}",
             "prob_h": r["prob_home_win"],
             "prob_d": r["prob_draw"],

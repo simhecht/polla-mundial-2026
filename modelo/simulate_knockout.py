@@ -443,9 +443,32 @@ def bracket_mc(conn, n_sims=N_SIMS_MC, r32=None):
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
-def get_bracket_data(conn, n_sims=N_SIMS_MC):
+def _format_mc_odds(mc_probs, teams):
+    """Formatea las probabilidades de campeón del Monte Carlo para el dashboard."""
+    return sorted(
+        [{"name": n, "name_es": name_es(teams.get(n, {"name_es": n, "name": n})),
+          "prob": p, "elo": teams[n]["elo_rating"] if n in teams else 0}
+         for n, p in mc_probs.items() if p >= 0.3],
+        key=lambda x: -x["prob"]
+    )
+
+
+def compute_mc_odds(conn, n_sims=N_SIMS_MC, r32=None):
+    """Monte Carlo del bracket → lista ordenada de probabilidades de campeón.
+    Reutilizable por app.py para cachear el cálculo caro (el MC del bracket)
+    y refrescarlo bajo demanda con el R32 vigente (overrides incluidos)."""
+    if r32 is None:
+        r32 = build_r32(conn)
+    teams = _load_teams(conn, r32)
+    mc_probs = bracket_mc(conn, n_sims=n_sims, r32=r32)
+    return _format_mc_odds(mc_probs, teams)
+
+
+def get_bracket_data(conn, n_sims=N_SIMS_MC, mc_odds=None):
     """Retorna datos estructurados del bracket para el dashboard (sin prints).
-    Formato: {"rounds": {...}, "champion": str, "champion_es": str, "mc_odds": [...]}"""
+    Formato: {"rounds": {...}, "champion": str, "champion_es": str, "mc_odds": [...]}
+    mc_odds: lista precalculada (cache de app.py). Si es None se corre el
+    Monte Carlo completo del bracket (la parte cara)."""
     r32 = build_r32(conn)
     teams = _load_teams(conn, r32)
 
@@ -497,14 +520,11 @@ def get_bracket_data(conn, n_sims=N_SIMS_MC):
 
     champion = current[0]
 
-    # Monte Carlo (mismo R32 derivado, mismas sedes)
-    mc_probs = bracket_mc(conn, n_sims=n_sims, r32=r32)
-    mc_odds = sorted(
-        [{"name": n, "name_es": name_es(teams.get(n, {"name_es": n, "name": n})),
-          "prob": p, "elo": teams[n]["elo_rating"] if n in teams else 0}
-         for n, p in mc_probs.items() if p >= 0.3],
-        key=lambda x: -x["prob"]
-    )
+    # Monte Carlo (mismo R32 derivado, mismas sedes) — se omite si app.py
+    # entrega mc_odds precalculado (cache del server interactivo).
+    if mc_odds is None:
+        mc_probs = bracket_mc(conn, n_sims=n_sims, r32=r32)
+        mc_odds = _format_mc_odds(mc_probs, teams)
 
     return {
         "rounds": rounds_data,
