@@ -13,6 +13,11 @@ está resuelto y verificado.
   Calibrar sobre un dataset histórico de partidos internacionales (hay datasets públicos
   con miles de partidos + ELO histórico), optimizando log-loss o RPS, con conjunto de
   test separado. Re-reportar métricas honestas.
+  **Avance 10 jun:** los datos ya están en la DB local (`intl_matches`, 49.472 partidos
+  1872→2026, con `team_name_map` para nuestros 48 equipos; ver `load_history.py`).
+  Falta: ELO histórico (computable desde el propio dataset con K estándar) y el
+  pipeline de calibración. Filtrar `home_score IS NOT NULL` (fixtures futuros vienen
+  vacíos).
 
 - [x] **Adaptar la capa de decisión al esquema de puntos real de la polla.** ✅ v3.3
   (10 jun): reglamento implementado en `polla_points.py` (6/4/3/1 en grupos; 9/6/6/3
@@ -62,7 +67,8 @@ está resuelto y verificado.
   los cruces entre élites tienden a ser más cerrados. Revisar al recalibrar.
 
 - [ ] **Penales:** conversión fija 76% para todos; no distingue arqueros ni pateadores.
-  Refinamiento posible con datos por selección.
+  Refinamiento posible con datos por selección — ya hay 678 definiciones históricas
+  cargadas en `intl_shootouts` (load_history.py).
 
 - [ ] **ELO estático durante el torneo:** el modelo no actualiza ratings con los
   resultados simulados de rondas previas. Para una polla entregada de antemano es

@@ -40,6 +40,8 @@ polla/
 │   ├── polla_points.py      # Reglamento de la polla + apuesta óptima por valor esperado
 │   ├── overrides.py         # Overrides manuales (datos en modelo/data/overrides.json)
 │   ├── override.py          # CLI de overrides: set / set-ko / list / clear
+│   ├── app.py               # Mini-app local: dashboard con edición de overrides en vivo
+│   ├── load_history.py      # Carga el histórico internacional (data/raw/) en la DB
 │   ├── report_md.py         # Regenera las tablas de ESTADO_PROYECTO.md
 │   ├── update_all_teams.py  # Re-aplica ELO/forma/notas (idempotente, ya no obligatorio)
 │   ├── update_team.py       # CLI para actualizar un equipo individual
@@ -47,6 +49,14 @@ polla/
 ├── dashboard_mundial2026.html
 └── ESTADO_PROYECTO.md       # Estado detallado, grupos simulados, bracket, campeón
 ```
+
+## Dashboard interactivo
+
+```bash
+python3 modelo/app.py    # http://localhost:8765 — editar apuestas (✏️) desde el navegador
+```
+
+Los cambios manuales cascadean a la tabla del grupo, los terceros y el bracket. El Monte Carlo se cachea al inicio y se recalcula con el botón "Recalcular Monte Carlo".
 
 ## Uso rápido
 

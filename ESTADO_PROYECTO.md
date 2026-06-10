@@ -24,6 +24,8 @@ Todos en `/Users/simon/Desktop/polla/modelo/`:
 | `polla_points.py` | Reglamento de puntos de la polla + optimizador de apuesta por valor esperado (`best_bet_group`, `best_bet_ko`). Tests: `python3 test_polla_points.py`. |
 | `overrides.py` + `override.py` | Overrides manuales de resultados (persisten en `modelo/data/overrides.json`); cascadean a tabla → terceros → bracket. CLI: `set`, `set-ko --advancer`, `list`, `clear`. |
 | `report_md.py` | Regenera las secciones 4-6b de ESTADO_PROYECTO.md desde el modelo (evita tablas obsoletas). |
+| `app.py` | Mini-app local: sirve el dashboard con edición de overrides en vivo (✏️ por partido, barra de overrides, recálculo MC bajo demanda). `python3 app.py [--port 8765] [--n-sims 5000]`. El HTML estático de `dashboard.py` no incluye la UI de edición. |
+| `load_history.py` | Carga `data/raw/*.csv` (dataset martj42/international_results) en la DB: `intl_matches` (49.472 partidos 1872→2026), `intl_shootouts` (678 penales) y `team_name_map` (48 equipos → nombre del dataset). Base para la recalibración pendiente. ⚠️ Los fixtures futuros vienen con marcador NULL: filtrar `home_score IS NOT NULL`. |
 | `predictor_v2.py` | Versión anterior (obsoleta). Tenía ρ=−0.13, exp 0.6/0.4, form sin cap. |
 | `predictor.py` | Versión original (no usar). |
 | `dashboard.py` | Genera `dashboard_mundial2026.html`. Usa predictor_v3 y simulate_knockout. |
@@ -421,3 +423,11 @@ Tras cualquier cambio (override, forma, ELO), regenerar salidas:
 python3 dashboard.py     # dashboard HTML
 python3 report_md.py     # secciones 4-6b de este documento
 ```
+
+Modo app (edición de overrides desde el navegador, recomendado):
+```bash
+python3 app.py           # sirve el dashboard en http://localhost:8765 con botones ✏️
+```
+
+La DB no está en git (regenerable). Reconstrucción desde cero:
+`setup_db.setup()` → `python3 load_history.py` (los CSV crudos sí están en `data/raw/`).
