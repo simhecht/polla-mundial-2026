@@ -8,7 +8,7 @@ import sys
 import argparse
 import os
 
-DB_PATH = "/tmp/mundial_2026.db"
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "mundial_2026.db")
 
 
 def update_team(name, **kwargs):

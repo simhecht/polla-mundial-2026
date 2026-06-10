@@ -195,7 +195,7 @@ footer{{text-align:center;padding:2rem;color:var(--muted);font-size:.8rem;border
       amistosos + 12 cuotas de mercado). Curazao tiene λ≈0.52 vs Alemania.</p><br>
       <p><strong style="color:var(--accent)">Forma reciente:</strong> Score 1-10, capped ±25%.
       Eliminado el multiplicador sin límite (v2 daba ×1.8 para forma 9).</p><br>
-      <p><strong style="color:var(--accent)">Ventaja de local:</strong> México +20%/−8%,
+      <p><strong style="color:var(--accent)">Ventaja de local:</strong> México +20%/−13%,
       USA +13%/−6%, Canadá +10%/−5%. Basado en Pollard (2006): ~0.3 goles adicionales
       para el anfitrión mundialista. Incluye efecto arbitral.</p><br>
       <p><strong style="color:var(--accent)">Dixon-Coles ρ=−0.10:</strong> Calibrado para

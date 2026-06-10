@@ -8,7 +8,9 @@ Correcciones sobre v2:
   3. form_factor: capped ±25% (antes sin límite: form=9 generaba ×1.8).
   4. depth_factor: eliminado (exponent 0.2 lo hacía prácticamente inerte, rango 0.87-1.15).
   5. tactical_edge: desviaciones escaladas al 50% → rango ±6% máximo.
-  6. host_advantage: México (+20%/-8%), USA (+13%/-6%), Canadá (+10%/-5%).
+  6. host_advantage: México (+20%/-13%), USA (+13%/-6%), Canadá (+10%/-5%).
+     La penalización de México es mayor para que no quede anulada por el boost
+     de altitud (×1.12 en CDMX) y siempre reduzca el lambda rival vs. sede neutral.
 """
 
 import sqlite3
@@ -21,7 +23,7 @@ import numpy as np
 # ---------------------------------------------------------------------------
 # Configuración global
 # ---------------------------------------------------------------------------
-DB_PATH = "/tmp/mundial_2026.db"
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "mundial_2026.db")
 WORLD_CUP_AVG_GOALS = 1.3   # por equipo, por partido (promedio grupos ~2.7 total)
 N_SIMULATIONS      = 50_000
 DIXON_COLES_RHO    = -0.10  # calibrado para fútbol internacional (v2 usaba -0.13, clubs ingleses)
@@ -35,7 +37,7 @@ AVG_ELO = 1600
 
 # Form factor: ±25% máximo desde la media (5.0)
 # form=3 → ×0.90, form=5 → ×1.00, form=9 → ×1.20
-FORM_CAP = 0.25   # ½ de 0.25 por punto de desviación respecto a 5.0
+FORM_CAP = 0.25   # 0.05 por punto de desviación respecto a 5.0 (rango ±25% total)
 
 # v3.2: selección de marcador result-first
 # Si la diferencia entre prob_local y prob_visitante < este umbral,
@@ -51,7 +53,12 @@ RESULT_MARGIN_PP = 5.0
 HOST_ADVANTAGE = {
     "Mexico": {
         "boost":   0.20,
-        "penalty": 0.08,
+        # 0.13 (era 0.08): debe superar el boost de altitud de CDMX (×1.12) para
+        # que el rival siempre reciba MENOS lambda que en sede neutral.
+        # Umbral: 1 - 1/1.12 ≈ 10.7%; con el caso 'away en DB' (85% de la
+        # penalización) se requiere > 0.107/0.85 ≈ 12.6% → 0.13.
+        # Net CDMX: 1.12×0.87 = 0.974 (host como home) | 1.12×0.8895 = 0.996 (away en DB).
+        "penalty": 0.13,
         "venues":  {"Ciudad de Mexico", "Guadalajara", "Monterrey"},
     },
     "USA": {
@@ -165,6 +172,12 @@ MATCH_VENUES = {
     ("Croatia","Ghana"): "Seattle",
 }
 
+
+def get_venue(home, away):
+    """Lookup venue tolerante al orden: prueba (home, away) y luego (away, home)."""
+    return MATCH_VENUES.get((home, away)) or MATCH_VENUES.get((away, home))
+
+
 # ---------------------------------------------------------------------------
 # Matriz táctica — desviaciones escaladas al 50% (rango ±6% máximo)
 # Fórmula: new = 1.0 + (old - 1.0) × 0.5
@@ -214,7 +227,7 @@ def regenerate_db():
         _setup_db.setup()
     finally:
         _setup_db.DB_PATH = orig
-    _uat.run()
+    _uat.run(db_path=DB_PATH)
 
 def get_team(conn, name):
     cur = conn.cursor()
@@ -294,6 +307,7 @@ def dixon_coles_tau(gh, ga, mu, nu, rho):
     if gh == 0 and ga == 0: return 1.0 - mu * nu * rho
     elif gh == 1 and ga == 0: return 1.0 + nu * rho
     elif gh == 0 and ga == 1: return 1.0 + mu * rho
+    elif gh == 1 and ga == 1: return 1.0 - rho
     else: return 1.0
 
 def poisson_prob(lam, k):
@@ -361,7 +375,7 @@ def predict_match(name_home, name_away, conn=None, verbose=True, venue=None):
         raise e
 
     if venue is None:
-        venue = MATCH_VENUES.get((name_home, name_away))
+        venue = get_venue(name_home, name_away)
 
     lh, la = compute_lambdas(th, ta, venue=venue)
     matrix  = score_matrix_dc(lh, la)
@@ -372,7 +386,21 @@ def predict_match(name_home, name_away, conn=None, verbose=True, venue=None):
 
     top5 = sorted(matrix.items(), key=lambda x: -x[1])[:5]
     top3 = top5[:3]
-    best_score = best_score_result_first(matrix)
+
+    # best_score: marcador más probable CONDICIONADO al resultado más probable.
+    # Si P(victoria local) es máximo → el marcador modal entre gh>ga.
+    # Si P(empate) es máximo → el marcador modal entre gh==ga.
+    # Si P(victoria visitante) es máximo → el marcador modal entre gh<ga.
+    # top3_scores y top5_scores siguen siendo los modos crudos (informativos).
+    probs = {"home": prob_home, "draw": prob_draw, "away": prob_away}
+    dominant = max(probs, key=probs.__getitem__)
+    if dominant == "home":
+        cond_items = [(s, p) for (s, p) in matrix.items() if s[0] > s[1]]
+    elif dominant == "draw":
+        cond_items = [(s, p) for (s, p) in matrix.items() if s[0] == s[1]]
+    else:
+        cond_items = [(s, p) for (s, p) in matrix.items() if s[0] < s[1]]
+    best_score = max(cond_items, key=lambda x: x[1])[0] if cond_items else top3[0][0]
 
     elo_diff = abs(th["elo_rating"] - ta["elo_rating"])
     confidence = "alta" if elo_diff > 250 else "media" if elo_diff > 100 else "baja"
@@ -443,7 +471,7 @@ def simulate_group_mc(group_name, conn, n_sims=N_SIMULATIONS):
     for home_name, away_name in fixtures:
         th  = get_team(conn, home_name)
         ta  = get_team(conn, away_name)
-        ven = MATCH_VENUES.get((home_name, away_name))
+        ven = get_venue(home_name, away_name)
         lh, la = compute_lambdas(th, ta, venue=ven)
         match_lambdas.append((home_name, away_name, lh, la))
 
@@ -452,8 +480,16 @@ def simulate_group_mc(group_name, conn, n_sims=N_SIMULATIONS):
     all_gh = np.zeros((n_m, n_sims), dtype=np.int32)
     all_ga = np.zeros((n_m, n_sims), dtype=np.int32)
     for i, (_, _, lh, la) in enumerate(match_lambdas):
-        all_gh[i] = rng.poisson(lh, n_sims)
-        all_ga[i] = rng.poisson(la, n_sims)
+        # Muestreo desde la distribución conjunta Dixon-Coles (consistente con
+        # el motor analítico score_matrix_dc).
+        dc_matrix = score_matrix_dc(lh, la)
+        scores = list(dc_matrix.keys())
+        probs  = np.array([dc_matrix[s] for s in scores], dtype=np.float64)
+        probs /= probs.sum()   # renormalizar para evitar errores de punto flotante
+        indices = rng.choice(len(scores), size=n_sims, p=probs)
+        scores_arr = np.array(scores, dtype=np.int32)  # shape (N, 2)
+        all_gh[i] = scores_arr[indices, 0]
+        all_ga[i] = scores_arr[indices, 1]
 
     pts_arr = np.zeros((n_teams, n_sims), dtype=np.int32)
     gf_arr  = np.zeros((n_teams, n_sims), dtype=np.int32)
@@ -596,7 +632,7 @@ def group_report(group_name, conn=None, n_sims=N_SIMULATIONS):
     print(f"  {'-'*90}")
     for hn, an in fixtures:
         r   = predict_match(hn, an, conn=conn, verbose=False)
-        ven = MATCH_VENUES.get((hn, an), "N/A")
+        ven = get_venue(hn, an) or "N/A"
         alt = VENUE_ALTITUDE.get(ven, 0)
         mc_scores = match_score_dist.get((hn, an), [])
         mc_str = f"{mc_scores[0][0][0]}-{mc_scores[0][0][1]}({mc_scores[0][1]/n_sims*100:.1f}%)" if mc_scores else "N/A"
