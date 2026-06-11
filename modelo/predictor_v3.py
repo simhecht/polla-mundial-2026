@@ -21,8 +21,9 @@ from itertools import product
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from polla_points import best_bet_group, expected_points_group
+from polla_points import best_bet_group, expected_points_group, points_group
 from overrides import group_override
+from results import group_result
 
 # ---------------------------------------------------------------------------
 # Configuración global
@@ -455,7 +456,14 @@ def simulate_group_mc(group_name, conn, n_sims=N_SIMULATIONS):
     n_m   = len(match_lambdas)
     all_gh = np.zeros((n_m, n_sims), dtype=np.int32)
     all_ga = np.zeros((n_m, n_sims), dtype=np.int32)
-    for i, (_, _, lh, la) in enumerate(match_lambdas):
+    for i, (home_name, away_name, lh, la) in enumerate(match_lambdas):
+        # Partido ya jugado (results.json): el marcador real se fija en todas
+        # las simulaciones — el MC re-simula solo los partidos pendientes.
+        res = group_result(home_name, away_name)
+        if res is not None:
+            all_gh[i][:] = res["score"][0]
+            all_ga[i][:] = res["score"][1]
+            continue
         # Muestreo desde la distribución conjunta Dixon-Coles (consistente con
         # el motor analítico score_matrix_dc).
         dc_matrix = score_matrix_dc(lh, la)
@@ -525,12 +533,17 @@ def simulate_group(group_name, conn=None, verbose=True):
 
     results = []
     for home_name, away_name in fixtures:
-        # Override manual (overrides.json): fija el marcador del escenario
-        # determinista → cascadea a standings, terceros y bracket (build_r32).
-        ov = group_override(home_name, away_name)
+        # Prioridad: resultado real (results.json) > override manual
+        # (overrides.json) > apuesta del modelo. Ambos cascadean a standings,
+        # terceros y bracket (build_r32).
+        res = group_result(home_name, away_name)
+        ov  = group_override(home_name, away_name)
+        fixed = res["score"] if res else ov
         r = predict_match(home_name, away_name, conn=conn, verbose=False,
-                          override=ov)
+                          override=fixed)
         gh, ga = r["best_score"]
+        played = res is not None
+        bet    = res["bet"] if played else None
         results.append({
             "home": r["home"], "away": r["away"],
             # Nombres raw (columna `name` de la DB) — necesarios para que la
@@ -542,7 +555,12 @@ def simulate_group(group_name, conn=None, verbose=True):
             "prob_a": r["prob_away_win"],
             "top3":   r["top3_scores"],
             "exp_pts": r["exp_pts"],
-            "manual":  r["manual"],
+            # manual = apuesta fijada por el usuario; un partido jugado ya no
+            # es una apuesta editable, así que no se marca manual.
+            "manual":  (ov is not None) and not played,
+            "played":  played,
+            "bet":     f"{bet[0]}-{bet[1]}" if bet else None,
+            "points":  points_group(bet, res["score"]) if (played and bet) else None,
         })
         sh, sa = standings[home_name], standings[away_name]
         sh["gf"] += gh; sh["ga"] += ga

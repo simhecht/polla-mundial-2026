@@ -5,6 +5,11 @@ Lo estructural (Dixon-Coles completo, MC consistente, bracket dinámico, sedes e
 datos unificados, capa de decisión EV con reglamento real, overrides manuales) ya
 está resuelto y verificado.
 
+**Avance 10 jun (noche, v3.5):** resultados reales de partidos jugados (`results.py`,
+prioridad real > override > modelo, MC condicionado a lo jugado), puntos de polla
+automáticos (apuesta congelada al ingresar el resultado vs marcador real), modal de
+edición propio (reemplaza `prompt()`), y vista móvil del bracket (lista por ronda).
+
 ## Alta prioridad — afectan la calidad de la predicción
 
 - [ ] **Recalibrar con datos serios y validar out-of-sample.** Los exponentes ELO

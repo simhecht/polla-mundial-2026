@@ -8,11 +8,15 @@ con UI de edición en vivo:
                           (overrides incluidos). El Monte Carlo (la parte
                           cara) se calcula UNA vez al inicio y se cachea;
                           las partes deterministas se recalculan en cada GET.
-  POST /api/override    → {"scope":"group"|"ko","home":raw,"away":raw,
-                           "gh":int,"ga":int,"advancer":raw|null}
-  POST /api/clear       → {"home":raw,"away":raw} o {"all":true}
-  POST /api/recalc-mc   → recalcula el Monte Carlo del bracket con el R32
-                          actual (puede tardar; responde al terminar).
+  POST /api/override     → {"scope":"group"|"ko","home":raw,"away":raw,
+                            "gh":int,"ga":int,"advancer":raw|null}
+  POST /api/clear        → {"home":raw,"away":raw} o {"all":true}
+  POST /api/result       → resultado REAL: igual que override + "bet" opcional
+                           (apuesta vigente, para congelarla y calcular puntos).
+                           Recalcula el MC del grupo afectado.
+  POST /api/clear-result → {"home":raw,"away":raw} o {"all":true}
+  POST /api/recalc-mc    → recalcula el Monte Carlo del bracket con el R32
+                           actual (puede tardar; responde al terminar).
 
 Uso:
     python3 app.py [--port 8765] [--n-sims 5000] [--no-browser]
@@ -32,6 +36,7 @@ from predictor_v3 import DB_PATH, regenerate_db, simulate_group_mc, get_team
 from simulate_knockout import compute_mc_odds
 from dashboard import GROUPS, render_dashboard_html
 from overrides import set_group_override, set_ko_override, clear_overrides, load_overrides
+from results import set_group_result, set_ko_result, clear_results, load_results
 
 # ---------------------------------------------------------------------------
 # Estado global del server (cache del Monte Carlo)
@@ -39,7 +44,9 @@ from overrides import set_group_override, set_ko_override, clear_overrides, load
 STATE = {
     "n_sims":   5000,
     "mc_odds":  None,   # probabilidades de campeón (bracket MC) — cacheado
-    "group_mc": None,   # {grupo: finish_counts} — cacheado (no depende de overrides)
+    "group_mc": None,   # {grupo: finish_counts} — cacheado; los overrides no lo
+                        # afectan, pero los resultados REALES sí (se recalcula
+                        # el grupo afectado en /api/result y /api/clear-result)
 }
 LOCK = threading.Lock()  # protege recálculos del MC
 
@@ -143,6 +150,103 @@ def handle_clear(body):
     return {"ok": True, "removed": n}
 
 
+def _group_of(conn, team_name):
+    """Grupo (letra) al que pertenece un equipo, o None."""
+    cur = conn.cursor()
+    cur.execute("SELECT group_name FROM teams WHERE name=?", (team_name,))
+    row = cur.fetchone()
+    return row[0] if row else None
+
+
+def _recalc_group_mc(group):
+    """Recalcula el Monte Carlo de UN grupo (rápido) — necesario porque los
+    resultados reales sí condicionan el MC, a diferencia de los overrides."""
+    if not group:
+        return
+    with LOCK:
+        conn = sqlite3.connect(DB_PATH)
+        try:
+            fc, _, _ = simulate_group_mc(group, conn, n_sims=STATE["n_sims"])
+            STATE["group_mc"][group] = fc
+        finally:
+            conn.close()
+
+
+def handle_result(body):
+    """Registra el resultado REAL de un partido. Congela la apuesta vigente
+    (bet) que envía el cliente — la que el usuario estaba viendo — para el
+    cálculo automático de puntos; si el partido ya tenía bet congelado,
+    results.py lo preserva."""
+    scope = body.get("scope")
+    if scope not in ("group", "ko"):
+        return {"ok": False, "error": 'scope debe ser "group" o "ko"'}
+    try:
+        gh, ga = int(body.get("gh")), int(body.get("ga"))
+    except (TypeError, ValueError):
+        return {"ok": False, "error": "gh y ga deben ser enteros"}
+    if gh < 0 or ga < 0 or gh > 20 or ga > 20:
+        return {"ok": False, "error": "Marcador fuera de rango (0-20)"}
+
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        home = _validate_team(conn, body.get("home"))
+        away = _validate_team(conn, body.get("away"))
+        advancer = body.get("advancer")
+        if scope == "ko":
+            if gh == ga:
+                if not advancer:
+                    return {"ok": False, "error":
+                            "advancer es obligatorio en partidos KO con empate"}
+                advancer = _validate_team(conn, advancer)
+                if advancer not in (home, away):
+                    return {"ok": False, "error":
+                            "advancer debe ser uno de los dos equipos del partido"}
+            else:
+                advancer = None
+        bet = body.get("bet")   # apuesta vigente al momento de ingresar
+        group = _group_of(conn, home) if scope == "group" else None
+    except ValueError as e:
+        return {"ok": False, "error": str(e)}
+    finally:
+        conn.close()
+
+    if scope == "group":
+        bet_score = None
+        if isinstance(bet, dict) and bet.get("score"):
+            bet_score = bet["score"]
+        set_group_result(home, away, gh, ga, bet=bet_score)
+        _recalc_group_mc(group)
+    else:
+        bet_ko = bet if isinstance(bet, dict) and bet.get("score") else None
+        set_ko_result(home, away, gh, ga, advancer=advancer, bet=bet_ko)
+    return {"ok": True, "scope": scope, "home": home, "away": away,
+            "score": [gh, ga], "advancer": advancer}
+
+
+def handle_clear_result(body):
+    """Borra resultados reales y recalcula el MC de los grupos afectados."""
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        if body.get("all"):
+            groups = sorted({g for e in load_results()["groups"]
+                             if (g := _group_of(conn, e["home"]))})
+            n = clear_results()
+        else:
+            home, away = body.get("home"), body.get("away")
+            if not home or not away:
+                return {"ok": False,
+                        "error": 'Se requiere {"home","away"} o {"all":true}'}
+            had_group = any(e for e in load_results()["groups"]
+                            if {e["home"], e["away"]} == {home, away})
+            groups = [_group_of(conn, home)] if had_group else []
+            n = clear_results(home, away)
+    finally:
+        conn.close()
+    for g in groups:
+        _recalc_group_mc(g)
+    return {"ok": True, "removed": n}
+
+
 def handle_recalc_mc():
     """Recalcula el Monte Carlo del bracket con el R32 actual (overrides
     incluidos). El MC de grupos no depende de overrides → no se recalcula."""
@@ -179,8 +283,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._send_json({"ok": False, "error": f"Error generando dashboard: {e}"}, 500)
         elif self.path == "/api/overrides":
-            # Conveniencia: estado actual de overrides.json
-            self._send_json({"ok": True, "overrides": load_overrides()})
+            # Conveniencia: estado actual de overrides.json y results.json
+            self._send_json({"ok": True, "overrides": load_overrides(),
+                             "results": load_results()})
         else:
             self._send_json({"ok": False, "error": "Ruta no encontrada"}, 404)
 
@@ -199,6 +304,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 resp = handle_override(body)
             elif self.path == "/api/clear":
                 resp = handle_clear(body)
+            elif self.path == "/api/result":
+                resp = handle_result(body)
+            elif self.path == "/api/clear-result":
+                resp = handle_clear_result(body)
             elif self.path == "/api/recalc-mc":
                 resp = handle_recalc_mc()
             else:

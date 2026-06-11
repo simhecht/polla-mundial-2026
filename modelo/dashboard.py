@@ -60,90 +60,248 @@ EDIT_CSS = """
 .edit-btn{background:none;border:none;cursor:pointer;font-size:.72rem;padding:0 .1rem;opacity:0;transition:opacity .15s ease;line-height:1}
 .match-block:hover .edit-btn,.ko-card:hover .edit-btn{opacity:.75}
 .edit-btn:hover{opacity:1!important}
+@media (hover:none){.edit-btn{opacity:.55}}
+@media (max-width:700px){.edit-bar{top:auto;bottom:.8rem;right:.8rem}}
+
+/* ── Modal de edición ── */
+.modal-overlay{position:fixed;inset:0;z-index:2000;background:rgba(2,6,23,.6);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .15s ease}
+.modal-overlay.open{opacity:1;pointer-events:auto}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.3rem 1.5rem;width:min(92vw,360px);box-shadow:0 16px 48px rgba(0,0,0,.5);transform:scale(.96);opacity:0;transition:transform .18s cubic-bezier(0.23,1,0.32,1),opacity .18s ease}
+.modal-overlay.open .modal{transform:scale(1);opacity:1}
+.modal-kind{font-size:.66rem;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;margin-bottom:.3rem}
+.modal-kind.k-bet{color:var(--accent)}
+.modal-kind.k-result{color:var(--green)}
+.modal h3{font-size:1rem;margin-bottom:1.1rem;font-weight:600}
+.modal-score{display:flex;align-items:center;justify-content:center;gap:.6rem;margin-bottom:1rem}
+.modal-team{display:flex;flex-direction:column;align-items:center;gap:.1rem;width:3.2rem}
+.modal-team .mt-flag{font-size:1.5rem;line-height:1}
+.modal-team .mt-code{font-size:.7rem;font-weight:700;color:var(--muted);letter-spacing:.5px}
+.modal-score input{width:3.2rem;height:2.6rem;text-align:center;font-size:1.25rem;font-weight:700;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:8px;outline:none;transition:border-color .15s ease}
+.modal-score input:focus{border-color:var(--accent)}
+.modal-score input::-webkit-outer-spin-button,.modal-score input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.modal-score input[type=number]{-moz-appearance:textfield;appearance:textfield}
+.modal-dash{color:var(--muted);font-weight:700}
+.modal-adv{margin-bottom:1rem}
+.modal-adv-label{font-size:.74rem;color:var(--muted);margin-bottom:.45rem;text-align:center}
+.modal-seg{display:flex;gap:.4rem;justify-content:center}
+.modal-seg button{flex:1;max-width:9rem;padding:.4rem .6rem;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:.78rem;font-weight:600;cursor:pointer;transition:border-color .15s ease,background-color .15s ease,transform .12s ease}
+.modal-seg button:active{transform:scale(.97)}
+.modal-seg button.sel{border-color:var(--green);background:rgba(16,185,129,.12);color:var(--green)}
+.modal-actions{display:flex;align-items:center;gap:.5rem}
+.modal-actions button{padding:.45rem .9rem;border-radius:8px;font-size:.78rem;font-weight:600;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text);transition:border-color .15s ease,color .15s ease,transform .12s ease}
+.modal-actions button:active{transform:scale(.97)}
+.modal-actions .m-save{background:var(--accent);border-color:var(--accent);color:#0f172a}
+.modal-actions .m-save:hover{filter:brightness(1.08)}
+.modal-actions .m-cancel:hover{border-color:var(--muted)}
+.modal-actions .m-del{color:var(--red);border-color:transparent;padding-left:.2rem}
+.modal-actions .m-del:hover{border-color:var(--red)}
+.modal-err{color:var(--red);font-size:.72rem;text-align:center;margin-bottom:.7rem;min-height:.9em}
 """
 
 EDIT_JS = r"""
-/* ── Modo interactivo: edición de resultados (servido por app.py) ── */
-const jsq = s => String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+/* ── Modo interactivo: edición de apuestas y resultados reales (app.py) ──
+   Cada partido renderizado se registra en MATCH_REG; los botones de la fila
+   abren el modal con el índice del registro. kind: 'bet' (apuesta manual,
+   /api/override) | 'result' (resultado real, /api/result). */
+const MATCH_REG = [];
 
-editGroupControls = r => {
-  const edit = `<button class="edit-btn" title="Editar marcador" onclick="editMatch('group','${jsq(r.home_raw)}','${jsq(r.away_raw)}','${jsq(r.home)}','${jsq(r.away)}','${r.score}')">✏️</button>`;
-  const clear = r.manual ? `<button class="edit-btn" title="Borrar este override" onclick="clearMatch('${jsq(r.home_raw)}','${jsq(r.away_raw)}')">🗑️</button>` : '';
-  return edit + clear;
-};
+function regControls(entry) {
+  const i = MATCH_REG.push(entry) - 1;
+  if (entry.played) {
+    return `<button class="edit-btn" title="Editar resultado real" onclick="openDlg(${i},'result')">✏️</button>` +
+           `<button class="edit-btn" title="Quitar resultado real" onclick="delEntry(${i},'result')">🗑️</button>`;
+  }
+  return `<button class="edit-btn" title="Ingresar resultado real" onclick="openDlg(${i},'result')">✅</button>` +
+         `<button class="edit-btn" title="Editar apuesta" onclick="openDlg(${i},'bet')">✏️</button>` +
+         (entry.manual ? `<button class="edit-btn" title="Borrar apuesta manual" onclick="delEntry(${i},'bet')">🗑️</button>` : '');
+}
 
-editKoControls = m => {
-  const edit = `<button class="edit-btn" title="Editar marcador" onclick="editMatch('ko','${jsq(m.home)}','${jsq(m.away)}','${jsq(m.home_es)}','${jsq(m.away_es)}','${m.score}')">✏️</button>`;
-  const clear = m.manual ? `<button class="edit-btn" title="Borrar este override" onclick="clearMatch('${jsq(m.home)}','${jsq(m.away)}')">🗑️</button>` : '';
-  return edit + clear;
-};
+editGroupControls = r => regControls({
+  scope: 'group', home: r.home_raw, away: r.away_raw, homeEs: r.home, awayEs: r.away,
+  score: r.score, advancer: null, played: !!r.played, manual: !!r.manual,
+  bet: {score: r.score, advancer: null},
+});
+
+editKoControls = m => regControls({
+  scope: 'ko', home: m.home, away: m.away, homeEs: m.home_es, awayEs: m.away_es,
+  score: m.score, advancer: m.advancer, played: !!m.played, manual: !!m.manual,
+  bet: {score: m.score, advancer: m.advancer},
+});
 
 async function apiPost(path, body) {
   try {
     const res = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json'},
                                    body: JSON.stringify(body)});
     const data = await res.json();
-    if (!data.ok) { alert('Error: ' + (data.error || 'desconocido')); return null; }
+    if (!data.ok) return {error: data.error || 'desconocido'};
     return data;
   } catch (e) {
-    alert('Error de conexión con el servidor local: ' + e);
-    return null;
+    return {error: 'sin conexión con el servidor local (' + e + ')'};
   }
 }
 
-function parseScore(txt) {
-  if (txt == null) return null;            // cancelado
-  const m = txt.trim().match(/^(\d+)\s*[-:]\s*(\d+)$/);
-  if (!m) { alert('Formato inválido. Usa por ejemplo: 2-1'); return null; }
-  return [parseInt(m[1], 10), parseInt(m[2], 10)];
+/* ── Modal ── */
+const DLG = {entry: null, kind: 'bet', adv: null};
+
+(function buildModal() {
+  const ov = document.createElement('div');
+  ov.className = 'modal-overlay';
+  ov.id = 'editModal';
+  ov.innerHTML = `
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-kind" id="mKind"></div>
+      <h3 id="mTitle"></h3>
+      <div class="modal-score">
+        <div class="modal-team"><span class="mt-flag" id="mFlagH"></span><span class="mt-code" id="mCodeH"></span></div>
+        <input id="mGh" type="number" min="0" max="20" inputmode="numeric">
+        <span class="modal-dash">–</span>
+        <input id="mGa" type="number" min="0" max="20" inputmode="numeric">
+        <div class="modal-team"><span class="mt-flag" id="mFlagA"></span><span class="mt-code" id="mCodeA"></span></div>
+      </div>
+      <div class="modal-adv" id="mAdvRow" hidden>
+        <div class="modal-adv-label">Empate en 90' — ¿quién avanza?</div>
+        <div class="modal-seg">
+          <button type="button" id="mAdvH"></button>
+          <button type="button" id="mAdvA"></button>
+        </div>
+      </div>
+      <div class="modal-err" id="mErr"></div>
+      <div class="modal-actions">
+        <button type="button" class="m-del" id="mDelete">Borrar</button>
+        <span style="flex:1"></span>
+        <button type="button" class="m-cancel" onclick="closeDlg()">Cancelar</button>
+        <button type="button" class="m-save" id="mSave">Guardar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e => { if (e.target === ov) closeDlg(); });
+  document.addEventListener('keydown', e => {
+    if (!ov.classList.contains('open')) return;
+    if (e.key === 'Escape') closeDlg();
+    if (e.key === 'Enter') document.getElementById('mSave').click();
+  });
+  ['mGh', 'mGa'].forEach(id =>
+    document.getElementById(id).addEventListener('input', syncAdvRow));
+  document.getElementById('mAdvH').onclick = () => setAdv('home');
+  document.getElementById('mAdvA').onclick = () => setAdv('away');
+  document.getElementById('mSave').onclick = saveDlg;
+  document.getElementById('mDelete').onclick = () => {
+    closeDlg();
+    delEntry(DLG.idx, DLG.kind);
+  };
+})();
+
+function setAdv(side) {
+  DLG.adv = side;
+  document.getElementById('mAdvH').classList.toggle('sel', side === 'home');
+  document.getElementById('mAdvA').classList.toggle('sel', side === 'away');
 }
 
-async function editMatch(scope, homeRaw, awayRaw, homeEs, awayEs, current) {
-  const txt = prompt(`Marcador para ${homeEs} vs ${awayEs} (formato 2-1):`, current || '');
-  const sc = parseScore(txt);
-  if (!sc) return;
+function syncAdvRow() {
+  const e = DLG.entry;
+  if (!e || e.scope !== 'ko') return;
+  const gh = document.getElementById('mGh').value,
+        ga = document.getElementById('mGa').value;
+  document.getElementById('mAdvRow').hidden = !(gh !== '' && gh === ga);
+}
+
+function openDlg(idx, kind) {
+  const e = MATCH_REG[idx];
+  DLG.entry = e; DLG.kind = kind; DLG.idx = idx; DLG.adv = null;
+  document.getElementById('mKind').textContent = kind === 'result' ? '✅ Resultado real' : '✏️ Apuesta manual';
+  document.getElementById('mKind').className = 'modal-kind ' + (kind === 'result' ? 'k-result' : 'k-bet');
+  document.getElementById('mTitle').textContent = `${e.homeEs} vs ${e.awayEs}`;
+  document.getElementById('mFlagH').textContent = getFlag(e.home);
+  document.getElementById('mCodeH').textContent = getCode(e.home);
+  document.getElementById('mFlagA').textContent = getFlag(e.away);
+  document.getElementById('mCodeA').textContent = getCode(e.away);
+  document.getElementById('mAdvH').textContent = getCode(e.home);
+  document.getElementById('mAdvA').textContent = getCode(e.away);
+  const sc = (e.score || '').match(/^(\d+)-(\d+)$/);
+  document.getElementById('mGh').value = sc ? sc[1] : '';
+  document.getElementById('mGa').value = sc ? sc[2] : '';
+  if (e.scope === 'ko' && e.advancer) setAdv(e.advancer === e.home ? 'home' : 'away');
+  document.getElementById('mErr').textContent = '';
+  // Borrar: visible si hay algo que borrar para este kind
+  const canDel = (kind === 'result' && e.played) || (kind === 'bet' && e.manual);
+  document.getElementById('mDelete').style.visibility = canDel ? 'visible' : 'hidden';
+  document.getElementById('editModal').classList.add('open');
+  syncAdvRow();
+  document.getElementById('mGh').focus();
+  document.getElementById('mGh').select();
+}
+
+function closeDlg() {
+  document.getElementById('editModal').classList.remove('open');
+}
+
+async function saveDlg() {
+  const e = DLG.entry;
+  const gh = parseInt(document.getElementById('mGh').value, 10),
+        ga = parseInt(document.getElementById('mGa').value, 10);
+  const err = document.getElementById('mErr');
+  if (isNaN(gh) || isNaN(ga) || gh < 0 || ga < 0 || gh > 20 || ga > 20) {
+    err.textContent = 'Ingresa un marcador válido (0–20).'; return;
+  }
   let advancer = null;
-  if (scope === 'ko' && sc[0] === sc[1]) {
-    const a = prompt(`Empate ${sc[0]}-${sc[1]}: ¿quién avanza (prórroga/penales)?\nEscribe "${homeEs}" o "${awayEs}":`);
-    if (a == null) return;
-    const t = a.trim().toLowerCase();
-    if (t === homeEs.toLowerCase() || t === homeRaw.toLowerCase()) advancer = homeRaw;
-    else if (t === awayEs.toLowerCase() || t === awayRaw.toLowerCase()) advancer = awayRaw;
-    else { alert('Equipo no reconocido. Debe ser uno de los dos del partido.'); return; }
+  if (e.scope === 'ko' && gh === ga) {
+    if (!DLG.adv) { err.textContent = 'Elige quién avanza en el empate.'; return; }
+    advancer = DLG.adv === 'home' ? e.home : e.away;
   }
-  const r = await apiPost('/api/override',
-    {scope, home: homeRaw, away: awayRaw, gh: sc[0], ga: sc[1], advancer});
-  if (r) location.reload();
+  const body = {scope: e.scope, home: e.home, away: e.away, gh, ga, advancer};
+  if (DLG.kind === 'result') {
+    // Congelar la apuesta vigente (la que el usuario está viendo) la primera
+    // vez que se ingresa el resultado; en ediciones el server preserva el bet.
+    let bet = null;
+    if (!e.played) {
+      const bs = (e.bet.score || '').match(/^(\d+)-(\d+)$/);
+      if (bs) bet = {score: [parseInt(bs[1], 10), parseInt(bs[2], 10)],
+                     advancer: e.bet.advancer || null};
+    }
+    body.bet = bet;
+  }
+  const btn = document.getElementById('mSave');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  const r = await apiPost(DLG.kind === 'result' ? '/api/result' : '/api/override', body);
+  btn.disabled = false; btn.textContent = 'Guardar';
+  if (r.error) { err.textContent = r.error; return; }
+  location.reload();
 }
 
-async function clearMatch(homeRaw, awayRaw) {
-  const r = await apiPost('/api/clear', {home: homeRaw, away: awayRaw});
-  if (r) location.reload();
+async function delEntry(idx, kind) {
+  const e = MATCH_REG[idx];
+  const what = kind === 'result' ? 'el resultado real' : 'la apuesta manual';
+  if (!confirm(`¿Borrar ${what} de ${e.homeEs} vs ${e.awayEs}?`)) return;
+  const r = await apiPost(kind === 'result' ? '/api/clear-result' : '/api/clear',
+                          {home: e.home, away: e.away});
+  if (!r.error) location.reload(); else alert('Error: ' + r.error);
 }
 
 async function clearAllOverrides() {
-  if (!confirm('¿Borrar TODOS los overrides manuales?')) return;
+  if (!confirm('¿Borrar TODAS las apuestas manuales? (los resultados reales no se tocan)')) return;
   const r = await apiPost('/api/clear', {all: true});
-  if (r) location.reload();
+  if (!r.error) location.reload(); else alert('Error: ' + r.error);
 }
 
 async function recalcMC() {
   const btn = document.getElementById('recalcBtn');
   btn.disabled = true; btn.textContent = 'Recalculando…';
   const r = await apiPost('/api/recalc-mc', {});
-  if (r) { location.reload(); return; }
+  if (!r.error) { location.reload(); return; }
   btn.disabled = false; btn.textContent = 'Recalcular';
+  alert('Error: ' + r.error);
 }
 
-/* Barra superior fija: contador de overrides + acciones globales */
+/* Barra fija: contadores + acciones globales */
 (function () {
-  let n = 0;
-  GROUPS_DATA.forEach(g => g.results.forEach(r => { if (r.manual) n++; }));
-  Object.values(BRACKET_DATA.rounds).forEach(ms => ms.forEach(m => { if (m.manual) n++; }));
+  let n = 0, p = 0;
+  GROUPS_DATA.forEach(g => g.results.forEach(r => { if (r.manual) n++; if (r.played) p++; }));
+  Object.values(BRACKET_DATA.rounds).forEach(ms => ms.forEach(m => { if (m.manual) n++; if (m.played) p++; }));
   const bar = document.createElement('div');
   bar.className = 'edit-bar';
-  bar.innerHTML = `<span>✏️ ${n} override${n === 1 ? '' : 's'}</span>
-    ${n > 0 ? '<button onclick="clearAllOverrides()">Limpiar</button>' : ''}
+  bar.innerHTML = `<span title="Resultados reales ingresados">✅ ${p}</span>
+    <span title="Apuestas fijadas a mano">✏️ ${n}</span>
+    ${n > 0 ? '<button onclick="clearAllOverrides()">Limpiar apuestas</button>' : ''}
     <button id="recalcBtn" onclick="recalcMC()" title="Recalcular Monte Carlo del bracket">Recalcular</button>`;
   document.body.appendChild(bar);
 })();
@@ -207,8 +365,21 @@ header p{color:var(--muted);margin-top:.35rem;font-size:.85rem}
 .m-team.home{justify-content:flex-end}
 .m-flag{font-size:1rem}
 .m-score{text-align:center;font-weight:700;color:var(--accent);background:rgba(51,65,85,.6);border-radius:6px;padding:2px 0;font-size:.85rem}
-.m-sub{grid-column:2;text-align:center;font-size:.66rem;color:var(--green);font-weight:600;margin-top:3px;min-height:.9em}
-.m-actions{grid-column:3;display:flex;gap:.2rem;align-items:center;margin-top:3px}
+.m-score.real{background:rgba(16,185,129,.15);color:var(--text);box-shadow:inset 0 0 0 1px rgba(16,185,129,.35)}
+.m-sub{grid-column:2;justify-self:center;white-space:nowrap;text-align:center;font-size:.66rem;color:var(--green);font-weight:600;margin-top:3px;min-height:.9em}
+.m-actions{grid-column:3;display:flex;gap:.2rem;align-items:center;justify-self:end;margin-top:3px}
+.m-tag{font-size:.6rem;color:var(--green);text-transform:uppercase;letter-spacing:1.5px;font-weight:600}
+.m-bet{color:var(--muted);font-weight:500}
+.pts-badge{font-weight:700}
+.pts-hi{color:var(--green)}
+.pts-mid{color:var(--accent)}
+.pts-low{color:var(--muted)}
+.pts-zero{color:var(--red)}
+
+/* ── Puntos polla (resumen) ── */
+.points-strip{display:flex;justify-content:center;align-items:center;gap:1.8rem;background:linear-gradient(135deg,rgba(16,185,129,.10),rgba(245,158,11,.06));border:1px solid rgba(16,185,129,.35);border-radius:10px;padding:.6rem 1.2rem;margin-bottom:1.4rem;font-size:.84rem;color:var(--muted);flex-wrap:wrap}
+.points-strip b{color:var(--text);font-size:1rem}
+.points-strip .ps-total b{color:var(--green);font-size:1.15rem}
 
 /* ── Campeón ── */
 .champion-card{background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(16,185,129,.05));border:1px solid var(--accent);border-radius:12px;padding:1.2rem 1.6rem;margin-bottom:1.6rem;display:flex;align-items:center;gap:2.5rem;flex-wrap:wrap}
@@ -243,6 +414,15 @@ header p{color:var(--muted);margin-top:.35rem;font-size:.85rem}
 .ko-score{text-align:center;font-size:.64rem;color:var(--muted);margin-top:3px;padding:2px 4px;border-top:1px solid rgba(51,65,85,.5);white-space:nowrap}
 .ko-score .ko-res{color:var(--text);font-weight:700}
 .ko-ev{color:var(--green);font-weight:600}
+.ko-card.ko-played{border-color:rgba(16,185,129,.5)}
+.ko-card.ko-played .ko-score{background:rgba(16,185,129,.08)}
+
+/* ── Bracket móvil (lista vertical por ronda) ── */
+#bracketList{display:none}
+.bkl-title{font-size:.68rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);font-weight:600;margin:1.1rem 0 .5rem;text-align:center}
+.ko-card.bkl{position:static;width:auto!important;height:auto!important;margin-bottom:.55rem;font-size:.78rem}
+.ko-card.bkl .ko-pct{font-size:.72rem}
+.ko-card.bkl .ko-score{font-size:.7rem;padding:3px 4px}
 
 /* ── Metodología ── */
 .method{max-width:700px;line-height:1.7;color:var(--muted)}
@@ -257,6 +437,21 @@ header p{color:var(--muted);margin-top:.35rem;font-size:.85rem}
 .help-box b{color:var(--text);font-weight:600}
 
 footer{text-align:center;padding:1.6rem;color:var(--muted);font-size:.75rem;margin-top:1rem}
+
+/* ── Móvil ── */
+@media (max-width:700px){
+  header{padding:1.5rem 1rem .9rem}
+  header h1{font-size:1.3rem}
+  header p{font-size:.78rem}
+  .container{padding:0 .75rem 4.5rem}
+  .groups-grid{grid-template-columns:1fr;gap:1rem}
+  .standings-table th:nth-child(5),.standings-table td:nth-child(5),
+  .standings-table th:nth-child(6),.standings-table td:nth-child(6){display:none}
+  .points-strip{gap:.9rem;font-size:.78rem}
+  .champion-card{padding:1rem;gap:1rem}
+  .bracket-wrap{display:none}
+  #bracketList{display:block}
+}
 """
 
 # ---------------------------------------------------------------------------
@@ -265,6 +460,7 @@ footer{text-align:center;padding:1.6rem;color:var(--muted);font-size:.75rem;marg
 BASE_JS = r"""
 function getFlag(name) { return FLAGS[name] || '🏳'; }
 function getCode(name) { return CODES[name] || (name || '').substring(0, 3).toUpperCase(); }
+function ptsClass(p) { return p >= 4 ? 'pts-hi' : p >= 3 ? 'pts-mid' : p >= 1 ? 'pts-low' : 'pts-zero'; }
 
 function showTab(id, el) {
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
@@ -294,18 +490,31 @@ function renderGroups() {
     const matchRows = group.results.map(r => {
       const hostHome = r.host_team && r.home_raw.startsWith(r.host_team);
       const hostAway = r.host_team && r.away_raw.startsWith(r.host_team);
-      const ev = r.exp_pts != null ? `EV ${r.exp_pts.toFixed(1)}` : '';
-      const manual = r.manual ? ' <span title="Resultado fijado manualmente">✏️</span>' : '';
-      return `
-      <div class="match-block${r.manual ? ' match-manual' : ''}"
-           title="${r.home} vs ${r.away} · Local ${r.prob_h}% · Empate ${r.prob_d}% · Visita ${r.prob_a}%">
-        <span class="m-prob ph">${Math.round(r.prob_h)}%</span>
+      let probsRow, scoreCls = 'm-score', sub, title;
+      if (r.played) {
+        probsRow = `<span class="m-prob ph"></span><span class="m-tag" style="text-align:center">✓ jugado</span><span class="m-prob pa"></span>`;
+        scoreCls += ' real';
+        sub = r.bet
+          ? `<span class="m-bet">Apuesta ${r.bet}</span> <span class="pts-badge ${ptsClass(r.points)}">+${r.points}</span>`
+          : '';
+        title = `${r.home} vs ${r.away} · Resultado real ${r.score}` +
+                (r.bet ? ` · Apuesta ${r.bet} → ${r.points} pts` : '');
+      } else {
+        probsRow = `<span class="m-prob ph">${Math.round(r.prob_h)}%</span>
         <span class="m-prob pd">${Math.round(r.prob_d)}%</span>
-        <span class="m-prob pa">${Math.round(r.prob_a)}%</span>
+        <span class="m-prob pa">${Math.round(r.prob_a)}%</span>`;
+        const ev = r.exp_pts != null ? `EV ${r.exp_pts.toFixed(1)}` : '';
+        const manual = r.manual ? ' <span title="Apuesta fijada manualmente">✏️</span>' : '';
+        sub = `${ev}${manual}`;
+        title = `${r.home} vs ${r.away} · Local ${r.prob_h}% · Empate ${r.prob_d}% · Visita ${r.prob_a}%`;
+      }
+      return `
+      <div class="match-block${r.manual ? ' match-manual' : ''}" title="${title}">
+        ${probsRow}
         <span class="m-team home">${getCode(r.home_raw)}${hostHome ? ' 🏠' : ''} <span class="m-flag">${getFlag(r.home_raw)}</span></span>
-        <span class="m-score">${r.score}</span>
+        <span class="${scoreCls}">${r.score}</span>
         <span class="m-team away"><span class="m-flag">${getFlag(r.away_raw)}</span> ${getCode(r.away_raw)}${hostAway ? ' 🏠' : ''}</span>
-        <span class="m-sub">${ev}${manual}</span>
+        <span class="m-sub">${sub}</span>
         <span class="m-actions">${editGroupControls(r)}</span>
       </div>`;
     }).join('');
@@ -347,6 +556,41 @@ function renderChampionCard() {
     </div>`;
 }
 
+/* ── Tarjeta KO (compartida por bracket espejado y lista móvil) ── */
+function koCardHTML(m) {
+  const hw = m.winner === m.home, aw = m.winner === m.away;
+  const res = m.went_et ? `${m.score} pen ${getCode(m.advancer)}` : m.score;
+  let extra;
+  if (m.played) {
+    extra = m.points != null
+      ? ` <span class="pts-badge ${ptsClass(m.points)}">+${m.points}</span>`
+      : ' <span class="m-tag">✓</span>';
+  } else {
+    extra = (m.exp_pts != null ? ` <span class="ko-ev">EV ${m.exp_pts.toFixed(1)}</span>` : '') +
+            (m.manual ? ' ✏️' : '');
+  }
+  const pct = side => m.played ? '' : `<span class="ko-pct">${side}%</span>`;
+  return `
+    <div class="ko-team ${hw ? 'winner' : ''}"><span class="ko-flag">${getFlag(m.home)}</span><span class="ko-name">${getCode(m.home)}</span>${pct(m.prob_h)}</div>
+    <div class="ko-team ${aw ? 'winner' : ''}"><span class="ko-flag">${getFlag(m.away)}</span><span class="ko-name">${getCode(m.away)}</span>${pct(m.prob_a)}</div>
+    <div class="ko-score"><span class="ko-res">${res}</span>${extra}${editKoControls(m)}</div>`;
+}
+
+function koCardTitle(m) {
+  const base = `${m.home_es} vs ${m.away_es} · ${m.score}${m.went_et ? ` (pen: ${m.advancer_es})` : ''}`;
+  if (m.played) {
+    return base + ' · resultado real' +
+           (m.bet ? ` · Apuesta ${m.bet}${m.bet_advancer ? ` (pen: ${getCode(m.bet_advancer)})` : ''} → ${m.points} pts` : '');
+  }
+  return base + ` · Local ${m.prob_h}% · Empate ${m.prob_d}% · Visita ${m.prob_a}%` +
+         (m.exp_pts != null ? ` · EV ${m.exp_pts}` : '') +
+         (m.manual ? ' · apuesta fijada manualmente' : '');
+}
+
+function koCardClass(m, extra) {
+  return 'ko-card' + (m.played ? ' ko-played' : m.manual ? ' ko-manual' : '') + (extra || '');
+}
+
 /* ── Bracket espejado: mitades izquierda/derecha, final al centro ── */
 function renderBracket() {
   const W = 132, G = 24, SLOT = 78, CARD_H = 68, HDR = 34;
@@ -380,19 +624,13 @@ function renderBracket() {
     for (let i = L.from; i < L.to; i++) {
       const m = R[L.round][i];
       const card = document.createElement('div');
-      card.className = 'ko-card' + (m.manual ? ' ko-manual' : '') + (L.round === 'Final' ? ' ko-final' : '');
+      card.className = koCardClass(m, L.round === 'Final' ? ' ko-final' : '');
       card.style.left   = x(ci) + 'px';
       card.style.top    = (cy(L.span, i - L.from) - CARD_H / 2) + 'px';
       card.style.width  = W + 'px';
       card.style.height = CARD_H + 'px';
-      const hw = m.winner === m.home, aw = m.winner === m.away;
-      const res = m.went_et ? `${m.score} pen ${getCode(m.advancer)}` : m.score;
-      const ev = m.exp_pts != null ? ` <span class="ko-ev">EV ${m.exp_pts.toFixed(1)}</span>` : '';
-      card.innerHTML = `
-        <div class="ko-team ${hw ? 'winner' : ''}"><span class="ko-flag">${getFlag(m.home)}</span><span class="ko-name">${getCode(m.home)}</span><span class="ko-pct">${m.prob_h}%</span></div>
-        <div class="ko-team ${aw ? 'winner' : ''}"><span class="ko-flag">${getFlag(m.away)}</span><span class="ko-name">${getCode(m.away)}</span><span class="ko-pct">${m.prob_a}%</span></div>
-        <div class="ko-score"><span class="ko-res">${res}</span>${ev}${m.manual ? ' ✏️' : ''}${editKoControls(m)}</div>`;
-      card.title = `${m.home_es} vs ${m.away_es} · ${m.score}${m.went_et ? ` (pen: ${m.advancer_es})` : ''} · Local ${m.prob_h}% · Empate ${m.prob_d}% · Visita ${m.prob_a}% · EV ${m.exp_pts}${m.manual ? ' · fijado manualmente' : ''}`;
+      card.innerHTML = koCardHTML(m);
+      card.title = koCardTitle(m);
       wrap.appendChild(card);
     }
   });
@@ -441,9 +679,49 @@ function renderBracket() {
   });
 }
 
+/* ── Bracket móvil: lista vertical por ronda ── */
+function renderBracketList() {
+  const list = document.getElementById('bracketList');
+  const ORDER = [['R32', '16avos de final'], ['R16', 'Octavos de final'],
+                 ['QF', 'Cuartos de final'], ['SF', 'Semifinales'], ['Final', 'Final 🏆']];
+  ORDER.forEach(([key, label]) => {
+    const t = document.createElement('div');
+    t.className = 'bkl-title';
+    t.textContent = label;
+    list.appendChild(t);
+    BRACKET_DATA.rounds[key].forEach(m => {
+      const card = document.createElement('div');
+      card.className = koCardClass(m, ' bkl' + (key === 'Final' ? ' ko-final' : ''));
+      card.innerHTML = koCardHTML(m);
+      card.title = koCardTitle(m);
+      list.appendChild(card);
+    });
+  });
+}
+
+/* ── Resumen de puntos polla (visible solo con partidos jugados) ── */
+function renderPointsStrip() {
+  let gp = 0, gn = 0, kp = 0, kn = 0;
+  GROUPS_DATA.forEach(g => g.results.forEach(r => {
+    if (r.played) { gn++; gp += r.points || 0; }
+  }));
+  Object.values(BRACKET_DATA.rounds).forEach(ms => ms.forEach(m => {
+    if (m.played) { kn++; kp += m.points || 0; }
+  }));
+  const el = document.getElementById('pointsStrip');
+  if (gn + kn === 0) { el.hidden = true; return; }
+  el.hidden = false;
+  const j = n => `${n} jugado${n === 1 ? '' : 's'}`;
+  el.innerHTML = `<span class="ps-total">🎯 Puntos polla: <b>${gp + kp}</b></span>
+    <span>Grupos: <b>${gp}</b> · ${j(gn)}</span>` +
+    (kn ? `<span>Eliminatoria: <b>${kp}</b> · ${j(kn)}</span>` : '');
+}
+
 renderGroups();
 renderChampionCard();
 renderBracket();
+renderBracketList();
+renderPointsStrip();
 """
 
 
@@ -473,6 +751,7 @@ def build_html(groups_data, bracket_data, interactive=False):
 </header>
 
 <div class="container">
+  <div id="pointsStrip" class="points-strip" hidden></div>
   <div class="tab-bar">
     <div class="tab active" onclick="showTab('grupos',this)">Grupos</div>
     <div class="tab" onclick="showTab('bracket',this)">Bracket</div>
@@ -490,6 +769,7 @@ def build_html(groups_data, bracket_data, interactive=False):
     <div class="bracket-wrap">
       <div id="bracketRounds"></div>
     </div>
+    <div id="bracketList"></div>
   </div>
 
   <!-- ────── TAB METODOLOGÍA ────── -->
@@ -534,7 +814,10 @@ def build_html(groups_data, bracket_data, interactive=False):
       <li><b>Fila verde</b> — clasifica directo a 16avos (1° y 2° del grupo).</li>
       <li><b>Fila ámbar</b> — puede clasificar como uno de los 8 mejores terceros.</li>
       <li><b>🏠</b> — anfitrión jugando de local (México +20% · USA +13% · Canadá +10%).</li>
-      <li><b>✏️</b> — resultado fijado manualmente por ti.</li>
+      <li><b>✏️</b> — apuesta fijada manualmente por ti.</li>
+      <li><b>✅ / marcador verde</b> — resultado real de un partido ya jugado; el modelo re-simula solo lo pendiente.</li>
+      <li><b>Apuesta X-Y · +N</b> — en partidos jugados: tu apuesta congelada y los puntos de polla que ganó.</li>
+      <li><b>🎯 Puntos polla</b> — suma de los puntos obtenidos en todos los partidos jugados.</li>
       <li><b>pen XXX</b> — empate en 90 minutos; ese equipo avanza por prórroga o penales.</li>
       <li><b>Puntos en grupos</b> — 6 marcador exacto · 4 ganador + goles de un equipo · 3 ganador · 1 goles de un equipo.</li>
       <li><b>Puntos en eliminatoria</b> — 9 exacto · 6 ganador + goles · 6 acertar quién avanza · 3 goles de un equipo en empates.</li>

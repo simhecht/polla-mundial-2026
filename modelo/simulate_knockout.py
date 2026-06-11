@@ -46,8 +46,9 @@ from predictor_v3 import (
     get_team, compute_lambdas, score_matrix_dc, simulate_group,
     DB_PATH, regenerate_db
 )
-from polla_points import best_bet_ko, expected_points_ko
+from polla_points import best_bet_ko, expected_points_ko, points_ko
 from overrides import ko_override
+from results import ko_result, load_results
 
 # ---------------------------------------------------------------------------
 # Parámetros
@@ -251,24 +252,42 @@ def predict_ko_match(th, ta, factor=KO_FACTOR, venue=None):
 
     best, adv_side, exp_pts = best_bet_ko(matrix, p_home_adv_draw)
 
-    # Override manual: fija la apuesta y recalcula su EV real
-    ov = ko_override(th["name"], ta["name"])
-    manual = ov is not None
-    if manual:
+    def _adv_side_for(score, advancer_name):
+        """Lado ('home'/'away') que avanza dado un marcador y, si es empate,
+        el nombre del que avanzó. Fallback: favorito por prórroga."""
+        if score[0] != score[1]:
+            return "home" if score[0] > score[1] else "away"
+        if advancer_name == th["name"]:
+            return "home"
+        if advancer_name == ta["name"]:
+            return "away"
+        return "home" if p_home_adv_draw >= 0.5 else "away"
+
+    # Prioridad: resultado real (results.json) > override (overrides.json)
+    # > apuesta del modelo. Un partido jugado fija el escenario y deja de ser
+    # una apuesta editable (manual=False).
+    res    = ko_result(th["name"], ta["name"])
+    played = res is not None
+    ov     = ko_override(th["name"], ta["name"])
+    manual = (ov is not None) and not played
+
+    bet_score, bet_advancer, points = None, None, None
+    if played:
+        best     = res["score"]
+        adv_side = _adv_side_for(best, res.get("advancer"))
+        exp_pts  = None   # el EV no aplica a un partido ya jugado
+        bet = res.get("bet")
+        if bet:
+            bet_score    = bet["score"]
+            bet_advancer = bet.get("advancer")
+            bet_adv_side = _adv_side_for(bet_score, bet_advancer)
+            points = points_ko(bet_score, bet_adv_side, best, adv_side)
+    elif manual:
         best = ov["score"]
-        if best[0] == best[1]:
-            if ov["advancer"] == th["name"]:
-                adv_side = "home"
-            elif ov["advancer"] == ta["name"]:
-                adv_side = "away"
-            else:
-                # Empate sin advancer en el override → favorito por prórroga
-                adv_side = "home" if p_home_adv_draw >= 0.5 else "away"
-        else:
-            adv_side = "home" if best[0] > best[1] else "away"
+        adv_side = _adv_side_for(best, ov.get("advancer"))
         exp_pts = expected_points_ko(matrix, p_home_adv_draw, best, adv_side)
 
-    # Si la apuesta es empate, el advancer define quién avanza (prórroga/penales)
+    # Si el marcador es empate, el advancer define quién avanza (prórroga/penales)
     if best[0] == best[1]:
         winner, went_et = (th if adv_side == "home" else ta), True
     else:
@@ -282,10 +301,14 @@ def predict_ko_match(th, ta, factor=KO_FACTOR, venue=None):
         "prob_d": round(prob_d*100,1),
         "prob_a": round(prob_a*100,1),
         "p_adv_home_draw": round(p_home_adv_draw*100, 1),
-        "exp_pts": round(exp_pts, 2),
+        "exp_pts": round(exp_pts, 2) if exp_pts is not None else None,
         "winner": winner,
         "advancer": winner["name"],
         "manual": manual,
+        "played": played,
+        "bet_score": bet_score,
+        "bet_advancer": bet_advancer,
+        "points": points,
         "venue": venue,
         "elo_diff": abs(th["elo_rating"] - ta["elo_rating"]),
     }
@@ -369,7 +392,7 @@ def bracket_deterministic(conn, r32=None):
         suffix = f" (pen: {w_es})" if r["went_et"] else ""
         manual_tag = " [manual]" if r["manual"] else ""
         print(f"  [{label:28s}] {venue:<17} {h_es:18} {gh}-{ga}{suffix} {a_es:18}  "
-              f"{r['prob_h']}%/{r['prob_d']}%/{r['prob_a']}%  EV={r['exp_pts']:.2f}"
+              f"{r['prob_h']}%/{r['prob_d']}%/{r['prob_a']}%  EV={r['exp_pts'] if r['exp_pts'] is not None else '—'}"
               f"  → {w_es}{manual_tag}")
         r32_winners.append(r["winner"]["name"])
 
@@ -390,7 +413,7 @@ def bracket_deterministic(conn, r32=None):
             suffix = f" (pen: {w_es})" if r["went_et"] else ""
             manual_tag = " [manual]" if r["manual"] else ""
             print(f"  {venue:<17} {h_es:20} {gh}-{ga}{suffix}  {a_es:20}  "
-                  f"{r['prob_h']}%/{r['prob_d']}%/{r['prob_a']}%  EV={r['exp_pts']:.2f}"
+                  f"{r['prob_h']}%/{r['prob_d']}%/{r['prob_a']}%  EV={r['exp_pts'] if r['exp_pts'] is not None else '—'}"
                   f"  → {w_es}{manual_tag}")
             next_round.append(r["winner"]["name"])
         current = next_round
@@ -406,6 +429,23 @@ def bracket_deterministic(conn, r32=None):
 # ---------------------------------------------------------------------------
 # Monte Carlo del bracket completo
 # ---------------------------------------------------------------------------
+def _real_ko_winners():
+    """Lookup {(home, away): winner_name} de partidos KO ya jugados
+    (results.json), en ambas orientaciones. Permite que el Monte Carlo del
+    bracket fije los partidos jugados y re-simule solo lo pendiente."""
+    real = {}
+    for e in load_results()["ko"]:
+        sc = e["score"]
+        if sc[0] != sc[1]:
+            w = e["home"] if sc[0] > sc[1] else e["away"]
+        else:
+            w = e.get("advancer")
+        if w:
+            real[(e["home"], e["away"])] = w
+            real[(e["away"], e["home"])] = w
+    return real
+
+
 def bracket_mc(conn, n_sims=N_SIMS_MC, r32=None):
     if r32 is None:
         r32 = build_r32(conn)
@@ -414,25 +454,29 @@ def bracket_mc(conn, n_sims=N_SIMS_MC, r32=None):
     champion_counts = {n: 0 for n in teams}
     rng = np.random.default_rng(seed=2026)
     cache = {}  # distribuciones DC por (home, away, venue)
-
-    r32_venues = [venue for (_, _, _, venue) in r32]
+    real_ko = _real_ko_winners()
 
     for _ in range(n_sims):
         # R32
         current = []
         for (home_name, away_name, _, venue) in r32:
-            w = sim_ko_match_mc(teams[home_name], teams[away_name], rng,
-                                venue=venue, cache=cache)
-            current.append(w["name"])
+            w = real_ko.get((home_name, away_name))
+            if w is None:
+                w = sim_ko_match_mc(teams[home_name], teams[away_name], rng,
+                                    venue=venue, cache=cache)["name"]
+            current.append(w)
 
         # R16 → Final
         for round_key in ("R16", "QF", "SF", "Final"):
             next_round = []
             for i, (idx_a, idx_b) in enumerate(ADVANCEMENT[round_key]):
                 hn, an = current[idx_a], current[idx_b]
-                w = sim_ko_match_mc(teams[hn], teams[an], rng,
-                                    venue=ROUND_VENUES[round_key][i], cache=cache)
-                next_round.append(w["name"])
+                w = real_ko.get((hn, an))
+                if w is None:
+                    w = sim_ko_match_mc(teams[hn], teams[an], rng,
+                                        venue=ROUND_VENUES[round_key][i],
+                                        cache=cache)["name"]
+                next_round.append(w)
             current = next_round
 
         champion_counts[current[0]] = champion_counts.get(current[0], 0) + 1
@@ -489,6 +533,10 @@ def get_bracket_data(conn, n_sims=N_SIMS_MC, mc_odds=None):
             "exp_pts": r["exp_pts"],
             "advancer": r["advancer"], "advancer_es": name_es(r["winner"]),
             "manual": r["manual"],
+            "played": r["played"],
+            "bet": f"{r['bet_score'][0]}-{r['bet_score'][1]}" if r["bet_score"] else None,
+            "bet_advancer": r["bet_advancer"],
+            "points": r["points"],
             "match_num": idx + 1,
             "label": label, "venue": venue,
         })
@@ -512,6 +560,10 @@ def get_bracket_data(conn, n_sims=N_SIMS_MC, mc_odds=None):
                 "exp_pts": r["exp_pts"],
                 "advancer": r["advancer"], "advancer_es": name_es(r["winner"]),
                 "manual": r["manual"],
+                "played": r["played"],
+                "bet": f"{r['bet_score'][0]}-{r['bet_score'][1]}" if r["bet_score"] else None,
+                "bet_advancer": r["bet_advancer"],
+                "points": r["points"],
                 "venue": venue,
             })
             next_round.append(winner_name)
