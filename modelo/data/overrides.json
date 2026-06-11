@@ -1,4 +1,111 @@
 {
-  "groups": [],
-  "ko": []
+  "groups": [
+    {
+      "home": "Brazil",
+      "away": "Morocco",
+      "score": [
+        2,
+        2
+      ]
+    },
+    {
+      "home": "Haiti",
+      "away": "Scotland",
+      "score": [
+        0,
+        3
+      ]
+    },
+    {
+      "home": "Brazil",
+      "away": "Haiti",
+      "score": [
+        4,
+        0
+      ]
+    },
+    {
+      "home": "Morocco",
+      "away": "Haiti",
+      "score": [
+        3,
+        0
+      ]
+    },
+    {
+      "home": "Ecuador",
+      "away": "Curacao",
+      "score": [
+        3,
+        0
+      ]
+    },
+    {
+      "home": "Ecuador",
+      "away": "Germany",
+      "score": [
+        2,
+        2
+      ]
+    },
+    {
+      "home": "Sweden",
+      "away": "Tunisia",
+      "score": [
+        2,
+        0
+      ]
+    },
+    {
+      "home": "Belgium",
+      "away": "Iran",
+      "score": [
+        2,
+        0
+      ]
+    },
+    {
+      "home": "New Zealand",
+      "away": "Egypt",
+      "score": [
+        0,
+        2
+      ]
+    },
+    {
+      "home": "New Zealand",
+      "away": "Belgium",
+      "score": [
+        0,
+        3
+      ]
+    },
+    {
+      "home": "Jordan",
+      "away": "Argentina",
+      "score": [
+        0,
+        3
+      ]
+    },
+    {
+      "home": "Ghana",
+      "away": "Panama",
+      "score": [
+        1,
+        1
+      ]
+    }
+  ],
+  "ko": [
+    {
+      "home": "Spain",
+      "away": "Argentina",
+      "score": [
+        1,
+        1
+      ],
+      "advancer": "Spain"
+    }
+  ]
 }

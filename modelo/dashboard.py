@@ -1,6 +1,6 @@
 """
-dashboard.py — v3.1 + Bracket eliminatorio
-Genera dashboard HTML con grupos y bracket de fase eliminatoria.
+dashboard.py — v3.4 UI limpia
+Genera dashboard HTML con grupos y bracket eliminatorio espejado (estilo torneo).
 """
 import sqlite3, json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -30,6 +30,21 @@ FLAG_EMOJIS = {
     "Portugal":"🇵🇹","DR Congo":"🇨🇩","Uzbekistan":"🇺🇿","Colombia":"🇨🇴",
     "England":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","Croatia":"🇭🇷","Ghana":"🇬🇭","Panama":"🇵🇦",
 }
+# Códigos FIFA (3 letras) — usados en partidos y bracket para ahorrar espacio
+TEAM_CODES = {
+    "Mexico":"MEX","South Korea":"KOR","South Africa":"RSA","Czechia":"CZE",
+    "Canada":"CAN","Bosnia":"BIH","Qatar":"QAT","Switzerland":"SUI",
+    "Brazil":"BRA","Morocco":"MAR","Haiti":"HAI","Scotland":"SCO",
+    "USA":"USA","Paraguay":"PAR","Australia":"AUS","Turkey":"TUR",
+    "Germany":"GER","Curacao":"CUW","Ivory Coast":"CIV","Ecuador":"ECU",
+    "Netherlands":"NED","Japan":"JPN","Sweden":"SWE","Tunisia":"TUN",
+    "Belgium":"BEL","Egypt":"EGY","Iran":"IRN","New Zealand":"NZL",
+    "Spain":"ESP","Saudi Arabia":"KSA","Uruguay":"URU","Cabo Verde":"CPV",
+    "France":"FRA","Senegal":"SEN","Norway":"NOR","Iraq":"IRQ",
+    "Argentina":"ARG","Algeria":"ALG","Austria":"AUT","Jordan":"JOR",
+    "Portugal":"POR","DR Congo":"COD","Uzbekistan":"UZB","Colombia":"COL",
+    "England":"ENG","Croatia":"CRO","Ghana":"GHA","Panama":"PAN",
+}
 HOST_TEAMS = {"Mexico","USA","Canada"}
 
 # ---------------------------------------------------------------------------
@@ -37,12 +52,14 @@ HOST_TEAMS = {"Mexico","USA","Canada"}
 # ---------------------------------------------------------------------------
 EDIT_CSS = """
 /* ── UI de edición (modo interactivo) ── */
-.edit-bar{position:fixed;top:0;right:0;z-index:1000;display:flex;align-items:center;gap:.7rem;background:rgba(15,23,42,.95);border:1px solid var(--border);border-top:none;border-right:none;border-bottom-left-radius:10px;padding:.4rem .9rem;font-size:.75rem;color:var(--muted);box-shadow:0 2px 8px rgba(0,0,0,.4)}
-.edit-bar button{background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:.2rem .6rem;font-size:.72rem;cursor:pointer}
+.edit-bar{position:fixed;top:.8rem;right:.8rem;z-index:1000;display:flex;align-items:center;gap:.5rem;background:rgba(30,41,59,.92);border:1px solid var(--border);border-radius:999px;padding:.3rem .5rem .3rem .9rem;font-size:.74rem;color:var(--muted);box-shadow:0 4px 16px rgba(0,0,0,.35);backdrop-filter:blur(8px)}
+.edit-bar button{background:transparent;color:var(--text);border:1px solid var(--border);border-radius:999px;padding:.22rem .75rem;font-size:.72rem;cursor:pointer;transition:border-color .15s ease,color .15s ease,transform .12s ease}
 .edit-bar button:hover{border-color:var(--accent);color:var(--accent)}
+.edit-bar button:active{transform:scale(.96)}
 .edit-bar button:disabled{opacity:.5;cursor:wait}
-.edit-btn{background:none;border:none;cursor:pointer;font-size:.7rem;padding:0 .1rem;opacity:.5;transition:opacity .15s;line-height:1}
-.edit-btn:hover{opacity:1}
+.edit-btn{background:none;border:none;cursor:pointer;font-size:.72rem;padding:0 .1rem;opacity:0;transition:opacity .15s ease;line-height:1}
+.match-block:hover .edit-btn,.ko-card:hover .edit-btn{opacity:.75}
+.edit-btn:hover{opacity:1!important}
 """
 
 EDIT_JS = r"""
@@ -115,7 +132,7 @@ async function recalcMC() {
   btn.disabled = true; btn.textContent = 'Recalculando…';
   const r = await apiPost('/api/recalc-mc', {});
   if (r) { location.reload(); return; }
-  btn.disabled = false; btn.textContent = 'Recalcular Monte Carlo';
+  btn.disabled = false; btn.textContent = 'Recalcular';
 }
 
 /* Barra superior fija: contador de overrides + acciones globales */
@@ -125,11 +142,308 @@ async function recalcMC() {
   Object.values(BRACKET_DATA.rounds).forEach(ms => ms.forEach(m => { if (m.manual) n++; }));
   const bar = document.createElement('div');
   bar.className = 'edit-bar';
-  bar.innerHTML = `<span>✏️ ${n} override${n === 1 ? '' : 's'} activo${n === 1 ? '' : 's'}</span>
-    <button onclick="clearAllOverrides()">Limpiar todos</button>
-    <button id="recalcBtn" onclick="recalcMC()">Recalcular Monte Carlo</button>`;
+  bar.innerHTML = `<span>✏️ ${n} override${n === 1 ? '' : 's'}</span>
+    ${n > 0 ? '<button onclick="clearAllOverrides()">Limpiar</button>' : ''}
+    <button id="recalcBtn" onclick="recalcMC()" title="Recalcular Monte Carlo del bracket">Recalcular</button>`;
   document.body.appendChild(bar);
 })();
+"""
+
+# ---------------------------------------------------------------------------
+# CSS base del dashboard
+# ---------------------------------------------------------------------------
+BASE_CSS = """
+:root {
+  --bg:#0f172a;--card:#1e293b;--border:#334155;
+  --text:#f1f5f9;--muted:#94a3b8;--accent:#f59e0b;
+  --green:#10b981;--red:#ef4444;--blue:#3b82f6;--host:#f97316;
+  --line:#475569;
+  --ease-out:cubic-bezier(0.23,1,0.32,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif}
+header{padding:2.2rem 1rem 1.4rem;text-align:center}
+header h1{font-size:1.7rem;font-weight:700;letter-spacing:.5px}
+header h1 em{font-style:normal;color:var(--accent)}
+header p{color:var(--muted);margin-top:.35rem;font-size:.85rem}
+.container{max-width:1440px;margin:0 auto;padding:0 1.5rem 2rem}
+
+/* ── Tabs ── */
+.tab-bar{display:flex;gap:.4rem;margin-bottom:1.6rem;justify-content:center;flex-wrap:wrap}
+.tab{padding:.45rem 1.3rem;border-radius:999px;border:1px solid transparent;cursor:pointer;font-size:.85rem;color:var(--muted);transition:color .15s var(--ease-out),background-color .15s var(--ease-out)}
+.tab:hover{color:var(--text)}
+.tab:active{transform:scale(.97)}
+.tab.active{background:var(--card);color:var(--text);border-color:var(--border);font-weight:600}
+.tab-content{display:none}.tab-content.active{display:block}
+
+/* ── Grupos ── */
+.groups-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(350px,1fr));gap:1.2rem}
+.group-card{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.group-header{padding:.55rem 1rem;display:flex;align-items:baseline;gap:.5rem;border-bottom:1px solid var(--border)}
+.group-label{font-size:.68rem;text-transform:uppercase;letter-spacing:2px;color:var(--muted)}
+.group-letter{font-size:1.15rem;font-weight:800;color:var(--accent)}
+.standings-table{width:100%;border-collapse:collapse;font-size:.8rem}
+.standings-table th{padding:.35rem .45rem;color:var(--muted);text-align:right;font-weight:500;font-size:.66rem;text-transform:uppercase;letter-spacing:.5px}
+.standings-table th:first-child{text-align:left;padding-left:1rem}
+.standings-table td{padding:.4rem .45rem;border-top:1px solid rgba(51,65,85,.5);text-align:right}
+.standings-table td:first-child{text-align:left;padding-left:1rem}
+.standings-table tr.qualified td{background:rgba(16,185,129,.08)}
+.standings-table tr.qualified-3rd td{background:rgba(245,158,11,.06)}
+.team-name{display:flex;align-items:center;gap:.4rem;font-weight:500;white-space:nowrap}
+.pts{font-weight:700;color:var(--accent)}
+.mc-pct{font-size:.72rem;color:var(--green);font-weight:600}
+.mc-pct.low{color:var(--muted);font-weight:500}
+
+/* ── Partidos ── */
+.matches-section{padding:.3rem 1rem .55rem;border-top:1px solid var(--border)}
+.match-block{display:grid;grid-template-columns:1fr 4rem 1fr;column-gap:.6rem;align-items:center;padding:.5rem .35rem;border-bottom:1px solid rgba(51,65,85,.45)}
+.match-block:last-child{border-bottom:none}
+.match-block.match-manual{background:rgba(245,158,11,.05);border-radius:8px}
+.m-prob{font-size:.64rem;color:var(--muted)}
+.m-prob.ph{text-align:right}
+.m-prob.pd{text-align:center}
+.m-prob.pa{text-align:left}
+.m-team{display:flex;align-items:center;gap:.35rem;font-size:.8rem;font-weight:600;letter-spacing:.5px}
+.m-team.home{justify-content:flex-end}
+.m-flag{font-size:1rem}
+.m-score{text-align:center;font-weight:700;color:var(--accent);background:rgba(51,65,85,.6);border-radius:6px;padding:2px 0;font-size:.85rem}
+.m-sub{grid-column:2;text-align:center;font-size:.66rem;color:var(--green);font-weight:600;margin-top:3px;min-height:.9em}
+.m-actions{grid-column:3;display:flex;gap:.2rem;align-items:center;margin-top:3px}
+
+/* ── Campeón ── */
+.champion-card{background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(16,185,129,.05));border:1px solid var(--accent);border-radius:12px;padding:1.2rem 1.6rem;margin-bottom:1.6rem;display:flex;align-items:center;gap:2.5rem;flex-wrap:wrap}
+.champion-info{display:flex;align-items:center;gap:1rem}
+.champion-trophy{font-size:2.2rem}
+.champion-info h2{font-size:1.25rem;color:var(--accent)}
+.champion-info p{color:var(--muted);font-size:.8rem;margin-top:.2rem}
+.odds-grid{display:flex;gap:1.5rem;flex-wrap:wrap;flex:1}
+.odds-row{flex:1;min-width:220px;max-width:340px}
+.odds-team{display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem;font-size:.8rem}
+.odds-flag{width:1.4em;text-align:center}
+.odds-name{flex:1;font-weight:500}
+.odds-prob{font-weight:700;color:var(--accent);min-width:3.5em;text-align:right}
+.odds-bar-bg{background:var(--border);border-radius:3px;height:4px;margin-bottom:.55rem;overflow:hidden}
+.odds-bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent),var(--green))}
+
+/* ── Bracket espejado ── */
+.bracket-wrap{overflow-x:auto;padding-bottom:1rem}
+#bracketRounds{position:relative;margin:0 auto}
+.bk-hdr{position:absolute;top:0;text-align:center;font-size:.64rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);font-weight:600}
+.bk-line{position:absolute;background:var(--line)}
+.ko-card{position:absolute;background:var(--card);border:1px solid var(--border);border-radius:8px;font-size:.72rem;overflow:hidden;transition:border-color .15s ease}
+.ko-card:hover{border-color:var(--accent);z-index:10}
+.ko-card.ko-final{border-color:var(--accent);box-shadow:0 0 14px rgba(245,158,11,.18)}
+.ko-card.ko-manual{border-color:var(--accent);background:rgba(245,158,11,.07)}
+.ko-team{display:flex;align-items:center;gap:.3rem;padding:4px 8px 0}
+.ko-flag{flex-shrink:0}
+.ko-name{flex:1;font-weight:600;letter-spacing:.5px;overflow:hidden;white-space:nowrap}
+.ko-pct{font-size:.66rem;color:var(--muted);white-space:nowrap}
+.ko-team.winner .ko-name{color:var(--accent)}
+.ko-team.winner .ko-pct{color:var(--green);font-weight:700}
+.ko-score{text-align:center;font-size:.64rem;color:var(--muted);margin-top:3px;padding:2px 4px;border-top:1px solid rgba(51,65,85,.5);white-space:nowrap}
+.ko-score .ko-res{color:var(--text);font-weight:700}
+.ko-ev{color:var(--green);font-weight:600}
+
+/* ── Metodología ── */
+.method{max-width:700px;line-height:1.7;color:var(--muted)}
+.method h3{color:var(--text);margin-bottom:1rem}
+.method p{margin-bottom:1rem}
+.method strong{color:var(--accent)}
+
+/* ── Ayuda (abajo de todo) ── */
+.help-box{background:var(--card);border:1px solid var(--border);border-radius:10px;font-size:.8rem;color:var(--muted);margin-top:2.5rem}
+.help-box summary{cursor:pointer;padding:.8rem 1.2rem;color:var(--text);font-weight:600;font-size:.85rem;user-select:none;list-style-position:inside}
+.help-box ul{list-style:none;padding:.2rem 1.3rem 1rem;display:flex;flex-direction:column;gap:.5rem;line-height:1.5}
+.help-box b{color:var(--text);font-weight:600}
+
+footer{text-align:center;padding:1.6rem;color:var(--muted);font-size:.75rem;margin-top:1rem}
+"""
+
+# ---------------------------------------------------------------------------
+# JS base del dashboard (render de grupos, campeón y bracket espejado)
+# ---------------------------------------------------------------------------
+BASE_JS = r"""
+function getFlag(name) { return FLAGS[name] || '🏳'; }
+function getCode(name) { return CODES[name] || (name || '').substring(0, 3).toUpperCase(); }
+
+function showTab(id, el) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  el.classList.add('active');
+}
+
+/* ── Grupos ── */
+function renderGroups() {
+  const c = document.getElementById('groupsContainer');
+  GROUPS_DATA.forEach(group => {
+    const card = document.createElement('div');
+    card.className = 'group-card';
+    const rows = group.standings.map((t, i) => {
+      const rc = i < 2 ? 'qualified' : (i === 2 ? 'qualified-3rd' : '');
+      const mc = t.mc_clasif || 0;
+      const mcCls = mc > 60 ? 'mc-pct' : 'mc-pct low';
+      return `<tr class="${rc}">
+        <td><div class="team-name">${t.flag} ${t.name_es}${t.is_host ? ' 🏠' : ''}</div></td>
+        <td>${t.w}</td><td>${t.d}</td><td>${t.l}</td>
+        <td>${t.gf}</td><td>${t.ga}</td><td>${t.gf - t.ga > 0 ? '+' : ''}${t.gf - t.ga}</td>
+        <td class="pts">${t.pts}</td>
+        <td class="${mcCls}">${mc}%</td>
+      </tr>`;
+    }).join('');
+    const matchRows = group.results.map(r => {
+      const hostHome = r.host_team && r.home_raw.startsWith(r.host_team);
+      const hostAway = r.host_team && r.away_raw.startsWith(r.host_team);
+      const ev = r.exp_pts != null ? `EV ${r.exp_pts.toFixed(1)}` : '';
+      const manual = r.manual ? ' <span title="Resultado fijado manualmente">✏️</span>' : '';
+      return `
+      <div class="match-block${r.manual ? ' match-manual' : ''}"
+           title="${r.home} vs ${r.away} · Local ${r.prob_h}% · Empate ${r.prob_d}% · Visita ${r.prob_a}%">
+        <span class="m-prob ph">${Math.round(r.prob_h)}%</span>
+        <span class="m-prob pd">${Math.round(r.prob_d)}%</span>
+        <span class="m-prob pa">${Math.round(r.prob_a)}%</span>
+        <span class="m-team home">${getCode(r.home_raw)}${hostHome ? ' 🏠' : ''} <span class="m-flag">${getFlag(r.home_raw)}</span></span>
+        <span class="m-score">${r.score}</span>
+        <span class="m-team away"><span class="m-flag">${getFlag(r.away_raw)}</span> ${getCode(r.away_raw)}${hostAway ? ' 🏠' : ''}</span>
+        <span class="m-sub">${ev}${manual}</span>
+        <span class="m-actions">${editGroupControls(r)}</span>
+      </div>`;
+    }).join('');
+    card.innerHTML = `
+      <div class="group-header"><span class="group-label">Grupo</span><span class="group-letter">${group.group}</span></div>
+      <table class="standings-table">
+        <thead><tr><th>Equipo</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>DG</th><th>Pts</th><th title="Probabilidad de clasificar directo (Monte Carlo)">Clasif</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="matches-section">${matchRows}</div>`;
+    c.appendChild(card);
+  });
+}
+
+/* ── Campeón ── */
+function renderChampionCard() {
+  const odds = BRACKET_DATA.mc_odds;
+  const maxProb = odds[0]?.prob || 1;
+  const champProb = (odds.find(t => t.name === BRACKET_DATA.champion) || {prob: 0}).prob;
+  const top8 = odds.slice(0, 8);
+  const makeRows = list => list.map(t => `
+    <div class="odds-team">
+      <span class="odds-flag">${getFlag(t.name)}</span>
+      <span class="odds-name">${t.name_es}</span>
+      <span class="odds-prob">${t.prob}%</span>
+    </div>
+    <div class="odds-bar-bg"><div class="odds-bar-fill" style="width:${(t.prob / maxProb * 100).toFixed(1)}%"></div></div>`).join('');
+  document.getElementById('championCard').innerHTML = `
+    <div class="champion-info">
+      <div class="champion-trophy">🏆</div>
+      <div>
+        <h2>${getFlag(BRACKET_DATA.champion)} ${BRACKET_DATA.champion_es}</h2>
+        <p>Campeón predicho · ${champProb}% de probabilidad</p>
+      </div>
+    </div>
+    <div class="odds-grid">
+      <div class="odds-row">${makeRows(top8.slice(0, 4))}</div>
+      <div class="odds-row">${makeRows(top8.slice(4, 8))}</div>
+    </div>`;
+}
+
+/* ── Bracket espejado: mitades izquierda/derecha, final al centro ── */
+function renderBracket() {
+  const W = 132, G = 24, SLOT = 78, CARD_H = 68, HDR = 34;
+  const R = BRACKET_DATA.rounds;
+  const LABELS = {R32: '16avos', R16: 'Octavos', QF: 'Cuartos', SF: 'Semifinal', Final: 'Final'};
+  const COLS = [
+    {round: 'R32',   from: 0, to: 8,  span: 1},
+    {round: 'R16',   from: 0, to: 4,  span: 2},
+    {round: 'QF',    from: 0, to: 2,  span: 4},
+    {round: 'SF',    from: 0, to: 1,  span: 8},
+    {round: 'Final', from: 0, to: 1,  span: 8},
+    {round: 'SF',    from: 1, to: 2,  span: 8},
+    {round: 'QF',    from: 2, to: 4,  span: 4},
+    {round: 'R16',   from: 4, to: 8,  span: 2},
+    {round: 'R32',   from: 8, to: 16, span: 1},
+  ];
+  const x  = c => c * (W + G);
+  const cy = (span, i) => HDR + (span * i + span / 2) * SLOT;
+  const wrap = document.getElementById('bracketRounds');
+  wrap.style.width  = (9 * W + 8 * G) + 'px';
+  wrap.style.height = (HDR + 8 * SLOT) + 'px';
+
+  COLS.forEach((L, ci) => {
+    const hdr = document.createElement('div');
+    hdr.className = 'bk-hdr';
+    hdr.style.left  = x(ci) + 'px';
+    hdr.style.width = W + 'px';
+    hdr.textContent = LABELS[L.round];
+    wrap.appendChild(hdr);
+
+    for (let i = L.from; i < L.to; i++) {
+      const m = R[L.round][i];
+      const card = document.createElement('div');
+      card.className = 'ko-card' + (m.manual ? ' ko-manual' : '') + (L.round === 'Final' ? ' ko-final' : '');
+      card.style.left   = x(ci) + 'px';
+      card.style.top    = (cy(L.span, i - L.from) - CARD_H / 2) + 'px';
+      card.style.width  = W + 'px';
+      card.style.height = CARD_H + 'px';
+      const hw = m.winner === m.home, aw = m.winner === m.away;
+      const res = m.went_et ? `${m.score} pen ${getCode(m.advancer)}` : m.score;
+      const ev = m.exp_pts != null ? ` <span class="ko-ev">EV ${m.exp_pts.toFixed(1)}</span>` : '';
+      card.innerHTML = `
+        <div class="ko-team ${hw ? 'winner' : ''}"><span class="ko-flag">${getFlag(m.home)}</span><span class="ko-name">${getCode(m.home)}</span><span class="ko-pct">${m.prob_h}%</span></div>
+        <div class="ko-team ${aw ? 'winner' : ''}"><span class="ko-flag">${getFlag(m.away)}</span><span class="ko-name">${getCode(m.away)}</span><span class="ko-pct">${m.prob_a}%</span></div>
+        <div class="ko-score"><span class="ko-res">${res}</span>${ev}${m.manual ? ' ✏️' : ''}${editKoControls(m)}</div>`;
+      card.title = `${m.home_es} vs ${m.away_es} · ${m.score}${m.went_et ? ` (pen: ${m.advancer_es})` : ''} · Local ${m.prob_h}% · Empate ${m.prob_d}% · Visita ${m.prob_a}% · EV ${m.exp_pts}${m.manual ? ' · fijado manualmente' : ''}`;
+      wrap.appendChild(card);
+    }
+  });
+
+  /* Líneas conectoras entre rondas */
+  const hline = (x1, x2, y) => {
+    const d = document.createElement('div');
+    d.className = 'bk-line';
+    d.style.left = Math.min(x1, x2) + 'px';
+    d.style.top = y + 'px';
+    d.style.width = Math.abs(x2 - x1) + 'px';
+    d.style.height = '1px';
+    wrap.appendChild(d);
+  };
+  const vline = (x0, y1, y2) => {
+    const d = document.createElement('div');
+    d.className = 'bk-line';
+    d.style.left = x0 + 'px';
+    d.style.top = Math.min(y1, y2) + 'px';
+    d.style.width = '1px';
+    d.style.height = Math.abs(y2 - y1) + 'px';
+    wrap.appendChild(d);
+  };
+  const LINKS = [[0,1],[1,2],[2,3],[3,4],[8,7],[7,6],[6,5],[5,4]];
+  LINKS.forEach(([si, di]) => {
+    const S = COLS[si], D = COLS[di];
+    const sCount = S.to - S.from, dCount = D.to - D.from;
+    const leftSide = si < di;
+    const gapL = (leftSide ? x(si) : x(di)) + W;   // borde izquierdo del espacio entre columnas
+    const midX = gapL + G / 2;
+    for (let j = 0; j < dCount; j++) {
+      const ty = cy(D.span, j);
+      if (sCount === dCount) { hline(gapL, gapL + G, ty); continue; }
+      const c1 = cy(S.span, 2 * j), c2 = cy(S.span, 2 * j + 1);
+      if (leftSide) {
+        hline(x(si) + W, midX, c1);
+        hline(x(si) + W, midX, c2);
+        hline(midX, x(di), ty);
+      } else {
+        hline(midX, x(si), c1);
+        hline(midX, x(si), c2);
+        hline(x(di) + W, midX, ty);
+      }
+      vline(midX, c1, c2);
+    }
+  });
+}
+
+renderGroups();
+renderChampionCard();
+renderBracket();
 """
 
 
@@ -139,6 +453,8 @@ def build_html(groups_data, bracket_data, interactive=False):
     con False (default) el HTML estático queda sin UI de edición."""
     gj = json.dumps(groups_data, ensure_ascii=False)
     bj = json.dumps(bracket_data, ensure_ascii=False)
+    fj = json.dumps(FLAG_EMOJIS, ensure_ascii=False)
+    cj = json.dumps(TEAM_CODES, ensure_ascii=False)
     edit_css = EDIT_CSS if interactive else ""
     edit_js  = EDIT_JS if interactive else ""
 
@@ -147,390 +463,99 @@ def build_html(groups_data, bracket_data, interactive=False):
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Polla Mundial 2026 — Predicciones v3.3</title>
-<style>
-:root {{
-  --bg:#0f172a;--card:#1e293b;--border:#334155;
-  --text:#f1f5f9;--muted:#94a3b8;--accent:#f59e0b;
-  --green:#10b981;--red:#ef4444;--blue:#3b82f6;--host:#f97316;
-  --purple:#8b5cf6;
-}}
-*{{box-sizing:border-box;margin:0;padding:0}}
-body{{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif}}
-header{{background:linear-gradient(135deg,#1e3a5f,#0f172a);padding:2rem;text-align:center;border-bottom:2px solid var(--accent)}}
-header h1{{font-size:2rem;color:var(--accent);letter-spacing:2px}}
-header p{{color:var(--muted);margin-top:.5rem;font-size:.9rem}}
-.container{{max-width:1400px;margin:0 auto;padding:2rem 1rem}}
-.tab-bar{{display:flex;gap:.5rem;margin-bottom:1.5rem;flex-wrap:wrap}}
-.tab{{padding:.4rem 1rem;border-radius:6px;border:1px solid var(--border);cursor:pointer;font-size:.85rem;background:var(--card);color:var(--muted);transition:all .2s}}
-.tab.active,.tab:hover{{background:var(--accent);color:#000;border-color:var(--accent);font-weight:600}}
-.tab-content{{display:none}}.tab-content.active{{display:block}}
-.model-info{{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:1rem 1.5rem;margin-bottom:1.5rem;font-size:.83rem;color:var(--muted)}}
-.model-info strong{{color:var(--accent)}}
-.legend{{display:flex;gap:1.5rem;margin-bottom:1rem;flex-wrap:wrap;font-size:.8rem}}
-.legend-item{{display:flex;align-items:center;gap:.4rem;color:var(--muted)}}
-.legend-box{{width:12px;height:12px;border-radius:3px}}
-.groups-grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:1.5rem}}
-.group-card{{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden}}
-.group-header{{padding:.75rem 1rem;background:var(--border);display:flex;align-items:center;gap:.75rem}}
-.group-letter{{font-size:1.5rem;font-weight:900;color:var(--accent)}}
-.standings-table{{width:100%;border-collapse:collapse;font-size:.82rem}}
-.standings-table th{{padding:.4rem;color:var(--muted);text-align:right;font-weight:500;font-size:.75rem}}
-.standings-table th:first-child{{text-align:left}}
-.standings-table td{{padding:.4rem;border-top:1px solid var(--border);text-align:right}}
-.standings-table td:first-child{{text-align:left}}
-.standings-table tr.qualified td{{background:rgba(16,185,129,.10)}}
-.standings-table tr.qualified-3rd td{{background:rgba(245,158,11,.08)}}
-.team-name{{display:flex;align-items:center;gap:.35rem;font-weight:500}}
-.pts{{font-weight:700;color:var(--accent)}}
-.mc-pct{{font-size:.72rem;color:var(--green);font-weight:600}}
-.mc-pct.low{{color:var(--muted)}}
-.conf-badge{{display:inline-block;font-size:.65rem;padding:1px 5px;border-radius:3px;color:white;font-weight:700;white-space:nowrap}}
-.matches-section{{padding:.75rem 1rem;border-top:1px solid var(--border)}}
-.matches-section h4{{font-size:.72rem;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:.5rem}}
-.match-row{{display:flex;align-items:center;padding:.28rem 0;font-size:.8rem;gap:.3rem;border-bottom:1px solid rgba(51,65,85,.4)}}
-.match-row:last-child{{border-bottom:none}}
-.match-teams{{flex:1;display:flex;justify-content:space-between;align-items:center;gap:.3rem}}
-.match-home{{text-align:right;flex:1;font-size:.78rem}}
-.match-score{{font-weight:700;color:var(--accent);padding:2px 6px;min-width:3rem;text-align:center;background:var(--border);border-radius:4px;font-size:.82rem}}
-.match-away{{flex:1;font-size:.78rem}}
-.match-meta{{font-size:.68rem;color:var(--muted);white-space:nowrap;text-align:right}}
-.third-note{{font-size:.73rem;color:var(--muted);padding:.4rem 1rem;font-style:italic}}
-footer{{text-align:center;padding:2rem;color:var(--muted);font-size:.8rem;border-top:1px solid var(--border);margin-top:3rem}}
-
-/* ── Bracket ── */
-.bracket-wrap{{overflow-x:auto;padding-bottom:1rem}}
-.champion-card{{background:linear-gradient(135deg,rgba(245,158,11,.15),rgba(16,185,129,.08));border:2px solid var(--accent);border-radius:12px;padding:1.5rem 2rem;margin-bottom:2rem;display:flex;align-items:center;gap:2rem;flex-wrap:wrap}}
-.champion-trophy{{font-size:3rem}}
-.champion-info h2{{font-size:1.4rem;color:var(--accent)}}
-.champion-info p{{color:var(--muted);font-size:.85rem;margin-top:.25rem}}
-.odds-grid{{display:flex;gap:1rem;flex-wrap:wrap;flex:1}}
-.odds-row{{flex:1;min-width:220px;max-width:340px}}
-.odds-team{{display:flex;align-items:center;gap:.5rem;margin-bottom:.35rem;font-size:.82rem}}
-.odds-flag{{width:1.4em;text-align:center}}
-.odds-name{{flex:1;font-weight:500}}
-.odds-prob{{font-weight:700;color:var(--accent);min-width:3.5em;text-align:right}}
-.odds-bar-bg{{background:var(--border);border-radius:3px;height:5px;margin-bottom:.6rem;overflow:hidden}}
-.odds-bar-fill{{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent),var(--green));transition:width .3s}}
-
-.bracket-note{{font-size:.78rem;color:var(--muted);margin-bottom:1rem;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:.6rem 1rem}}
-.bracket-rounds{{display:flex;gap:0;min-width:1100px}}
-.round-col{{flex:0 0 200px;position:relative}}
-.round-header{{text-align:center;font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:var(--accent);font-weight:700;padding:.4rem;height:32px;background:var(--card);border-bottom:1px solid var(--border);border-right:1px solid var(--border)}}
-.round-body{{position:relative;border-right:1px solid var(--border)}}
-.ko-card{{position:absolute;left:4px;right:4px;background:var(--card);border:1px solid var(--border);border-radius:6px;overflow:hidden;font-size:.71rem;cursor:default;transition:border-color .15s}}
-.ko-card:hover{{border-color:var(--accent);z-index:10}}
-.ko-card.sec-a{{border-left:3px solid var(--blue)}}
-.ko-card.sec-b{{border-left:3px solid var(--green)}}
-.ko-card.sec-c{{border-left:3px solid var(--host)}}
-.ko-card.sec-d{{border-left:3px solid var(--purple)}}
-.ko-card.sec-sf{{border-left:3px solid var(--accent)}}
-.ko-card.sec-final{{border-left:3px solid #ec4899;border:2px solid #ec4899}}
-.ko-team{{display:flex;align-items:center;gap:.25rem;padding:3px 5px}}
-.ko-team.winner{{background:rgba(245,158,11,.12);font-weight:700}}
-.ko-team.winner .ko-name{{color:var(--accent)}}
-.ko-flag{{width:1.1em;text-align:center;flex-shrink:0}}
-.ko-name{{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}}
-.ko-pct{{font-size:.67rem;color:var(--muted);white-space:nowrap}}
-.ko-team.winner .ko-pct{{color:var(--green);font-weight:700}}
-.ko-divider{{height:1px;background:var(--border);margin:0 4px}}
-.ko-score{{text-align:center;font-size:.65rem;color:var(--muted);padding:1px 4px}}
-.ko-score span{{color:var(--accent);font-weight:700}}
-.connector-right{{position:absolute;right:-1px;width:8px;border-top:1px solid var(--muted);top:50%}}
-.ev-badge{{display:inline-block;font-size:.65rem;color:var(--green);font-weight:600;margin-left:.3rem;opacity:.85}}
-.match-manual{{border-left:3px solid var(--accent)!important;background:rgba(245,158,11,.06)}}
-.manual-icon{{font-size:.72rem;margin-left:.3rem;cursor:help}}
-.ko-manual{{border:1px solid var(--accent)!important;background:rgba(245,158,11,.07)}}
-.ko-ev{{font-size:.62rem;color:var(--green);font-weight:600;margin-left:.25rem}}
-{edit_css}</style>
+<title>Polla Mundial 2026</title>
+<style>{BASE_CSS}{edit_css}</style>
 </head>
 <body>
 <header>
-  <h1>⚽ POLLA MUNDIAL 2026</h1>
-  <p>Modelo v3.3 — apuesta por valor esperado + overrides · Poisson + Dixon-Coles (ρ=−0.10) · ELO^2.8/2.1 · Calibrado 9 jun 2026</p>
+  <h1>⚽ Polla <em>Mundial 2026</em></h1>
+  <p>Simulador de predicciones · Monte Carlo 20.000 simulaciones</p>
 </header>
 
 <div class="container">
   <div class="tab-bar">
-    <div class="tab active" onclick="showTab('grupos',this)">📊 Grupos</div>
-    <div class="tab" onclick="showTab('bracket',this)">🏆 Bracket</div>
-    <div class="tab" onclick="showTab('info',this)">ℹ️ Metodología</div>
+    <div class="tab active" onclick="showTab('grupos',this)">Grupos</div>
+    <div class="tab" onclick="showTab('bracket',this)">Bracket</div>
+    <div class="tab" onclick="showTab('info',this)">Metodología</div>
   </div>
 
   <!-- ────── TAB GRUPOS ────── -->
   <div id="grupos" class="tab-content active">
-    <div class="model-info">
-      <strong>Modelo v3.3:</strong> ELO exponente 2.8/2.1 (calibrado 9 jun 2026 · 19 amistosos + 12 cuotas mercado) ·
-      Forma ±25% cap · Ventaja local: 🇲🇽 +20% / 🇺🇸 +13% / 🇨🇦 +10% ·
-      Dixon-Coles ρ=−0.10 · Marcador: apuesta que <strong>maximiza puntos esperados</strong> según reglamento polla ·
-      <strong>%Clasif</strong> = Monte Carlo 20,000 simulaciones · Validación: 79% dir · 74% top-3 · 42% exacto
-    </div>
-    <div class="legend">
-      <div class="legend-item"><div class="legend-box" style="background:rgba(16,185,129,.4)"></div> Clasifican directo (1° y 2°)</div>
-      <div class="legend-item"><div class="legend-box" style="background:rgba(245,158,11,.3)"></div> Posible mejor 3°</div>
-      <div class="legend-item">🏠 = Ventaja de local anfitrión</div>
-    </div>
-    <div class="model-info" style="font-size:.8rem;margin-bottom:1rem">
-      <strong>Nota sobre los marcadores:</strong> El marcador mostrado en cada partido <em>no es necesariamente el más probable</em>,
-      sino la apuesta que <strong>maximiza los puntos esperados</strong> según el reglamento de la polla
-      (6 pts exacto · 4 pts ganador + goles de un equipo · 3 pts ganador · 1 pt goles de un equipo).
-      <strong>EV</strong> = puntos esperados de esa apuesta ·
-      <strong>✏️</strong> = marcador fijado manualmente por el usuario ·
-      <strong>(pen: X)</strong> = empate en 90' y el equipo X avanza por prórroga o penales.
-    </div>
     <div class="groups-grid" id="groupsContainer"></div>
   </div>
 
   <!-- ────── TAB BRACKET ────── -->
   <div id="bracket" class="tab-content">
-
     <div id="championCard" class="champion-card"></div>
-
-    <div class="bracket-note">
-      <strong>Marcadores en bracket:</strong> La apuesta mostrada (marcador 90' + quién avanza) <em>maximiza los puntos esperados</em>
-      según el reglamento de la polla (9 pts exacto · 6 pts ganador + goles · 6 pts acertó quién avanza · 3 pts goles de un equipo en empates).
-      <strong>EV</strong> = puntos esperados de esa apuesta ·
-      <strong>✏️</strong> = marcador fijado manualmente ·
-      <strong>(pen: X)</strong> = empate en 90' y X avanza por prórroga/penales.
-      <br>
-      <strong>Simulación:</strong> 90 min → Prórroga (λ×0.45, 30 min) → Penales muerte súbita (76% conversión) ·
-      <strong>Bracket:</strong> fixture oficial FIFA 2026 · Annex C (3eros B,C,D,E,F,G,I,L) ·
-      Colores por sección: <span style="color:var(--blue)">■ A→QF1</span>
-      <span style="color:var(--green)"> ■ B→QF2</span>
-      <span style="color:var(--host)"> ■ C→QF3</span>
-      <span style="color:var(--purple)"> ■ D→QF4</span>
-    </div>
-
     <div class="bracket-wrap">
-      <div class="bracket-rounds" id="bracketRounds"></div>
+      <div id="bracketRounds"></div>
     </div>
   </div>
 
-  <!-- ────── TAB INFO ────── -->
+  <!-- ────── TAB METODOLOGÍA ────── -->
   <div id="info" class="tab-content">
-    <div style="max-width:700px;line-height:1.75;color:var(--muted)">
-      <h3 style="color:var(--text);margin-bottom:1rem">Metodología v3.3</h3>
-      <p><strong style="color:var(--accent)">Base ELO:</strong> Fuerza relativa de cada selección.
+    <div class="method">
+      <h3>Metodología — modelo v3.3</h3>
+      <p><strong>Resumen:</strong> ELO exponente 2.8/2.1, calibrado el 9 jun 2026 con 19 amistosos
+      + 12 cuotas de mercado · forma ±25% · Dixon-Coles ρ=−0.10 · Monte Carlo 20.000 simulaciones ·
+      Validación: 79% dirección · 74% top-3 · 42% marcador exacto.</p>
+      <p><strong>Base ELO:</strong> Fuerza relativa de cada selección.
       Exponentes ataque/defensa = 2.8/2.1 (calibrados el 9 jun 2026 por grid search sobre 19
-      amistosos + 12 cuotas de mercado). Curazao tiene λ≈0.52 vs Alemania.</p><br>
-      <p><strong style="color:var(--accent)">Forma reciente:</strong> Score 1-10, capped ±25%.
-      Eliminado el multiplicador sin límite (v2 daba ×1.8 para forma 9).</p><br>
-      <p><strong style="color:var(--accent)">Ventaja de local:</strong> México +20%/−13%,
+      amistosos + 12 cuotas de mercado). Curazao tiene λ≈0.52 vs Alemania.</p>
+      <p><strong>Forma reciente:</strong> Score 1-10, capped ±25%.
+      Eliminado el multiplicador sin límite (v2 daba ×1.8 para forma 9).</p>
+      <p><strong>Ventaja de local:</strong> México +20%/−13%,
       USA +13%/−6%, Canadá +10%/−5%. Basado en Pollard (2006): ~0.3 goles adicionales
-      para el anfitrión mundialista. Incluye efecto arbitral.</p><br>
-      <p><strong style="color:var(--accent)">Dixon-Coles ρ=−0.10:</strong> Calibrado para
-      fútbol internacional. Ajusta la probabilidad de marcadores bajos (0-0, 1-0, 0-1).</p><br>
-      <p><strong style="color:var(--accent)">Monte Carlo 20,000 iter.:</strong> % de clasificación
-      real, no solo el marcador modal. Empates en eliminatoria se resuelven con prórroga y penales.</p><br>
-      <p><strong style="color:var(--accent)">Selección de marcador (v3.3 — apuesta por valor esperado):</strong>
-      El modelo elige el marcador (y en KO el quién avanza) que <em>maximiza los puntos esperados</em>
-      según el reglamento de la polla: grupos → 6 exacto / 4 ganador+goles / 3 ganador / 1 goles de un equipo;
-      eliminatoria → 9/6/6/3 con empates. Esto reemplaza la heurística del "resultado dominante" de v3.2.
-      El EV mostrado refleja cuántos puntos se esperan ganar en promedio con esa apuesta.
-      Overrides manuales permiten fijar cualquier marcador (indicados con ✏️).</p>
+      para el anfitrión mundialista. Incluye efecto arbitral.</p>
+      <p><strong>Dixon-Coles ρ=−0.10:</strong> Calibrado para
+      fútbol internacional. Ajusta la probabilidad de marcadores bajos (0-0, 1-0, 0-1).</p>
+      <p><strong>Monte Carlo 20.000 iter.:</strong> % de clasificación
+      real, no solo el marcador modal. Empates en eliminatoria se resuelven con prórroga
+      (λ×0.45, 30 min) y penales muerte súbita (76% conversión). λ×0.90 en eliminatoria.</p>
+      <p><strong>Bracket:</strong> Fixture oficial FIFA 2026 · mejores terceros según Annex C
+      (combinación B,C,D,E,F,G,I,L).</p>
+      <p><strong>Selección de marcador (v3.3 — apuesta por valor esperado):</strong>
+      El modelo elige el marcador (y en eliminatoria, quién avanza) que <em>maximiza los puntos
+      esperados</em> según el reglamento de la polla. Esto reemplaza la heurística del
+      "resultado dominante" de v3.2. El EV mostrado refleja cuántos puntos se esperan ganar
+      en promedio con esa apuesta. Los overrides manuales permiten fijar cualquier marcador (✏️).</p>
     </div>
   </div>
+
+  <!-- ────── AYUDA (abajo de todo) ────── -->
+  <details class="help-box">
+    <summary>¿Cómo leer este dashboard?</summary>
+    <ul>
+      <li><b>Marcador</b> — es la apuesta que más puntos promete según el reglamento de la polla; no siempre es el resultado más probable.</li>
+      <li><b>EV</b> — puntos que esa apuesta gana en promedio (valor esperado).</li>
+      <li><b>% sobre cada partido</b> — probabilidad de victoria local · empate · victoria visita.</li>
+      <li><b>% junto a cada equipo en el bracket</b> — probabilidad de avanzar a la siguiente ronda.</li>
+      <li><b>Clasif</b> — probabilidad de terminar 1° o 2° del grupo (Monte Carlo).</li>
+      <li><b>Fila verde</b> — clasifica directo a 16avos (1° y 2° del grupo).</li>
+      <li><b>Fila ámbar</b> — puede clasificar como uno de los 8 mejores terceros.</li>
+      <li><b>🏠</b> — anfitrión jugando de local (México +20% · USA +13% · Canadá +10%).</li>
+      <li><b>✏️</b> — resultado fijado manualmente por ti.</li>
+      <li><b>pen XXX</b> — empate en 90 minutos; ese equipo avanza por prórroga o penales.</li>
+      <li><b>Puntos en grupos</b> — 6 marcador exacto · 4 ganador + goles de un equipo · 3 ganador · 1 goles de un equipo.</li>
+      <li><b>Puntos en eliminatoria</b> — 9 exacto · 6 ganador + goles · 6 acertar quién avanza · 3 goles de un equipo en empates.</li>
+    </ul>
+  </details>
 </div>
 
-<footer>Polla Mundial 2026 · Predictor v3.3 — apuesta por valor esperado + overrides · Calibrado 9 jun 2026 · Monte Carlo 20k sims</footer>
+<footer>Polla Mundial 2026 · Modelo v3.3 · Calibrado 9 jun 2026</footer>
 
 <script>
 const GROUPS_DATA = {gj};
 const BRACKET_DATA = {bj};
-
-const FLAGS = {json.dumps(FLAG_EMOJIS, ensure_ascii=False)};
-const CONF_COLORS = {{"UEFA":"#3b82f6","CONMEBOL":"#10b981","CONCACAF":"#f59e0b","AFC":"#ef4444","CAF":"#8b5cf6","OFC":"#6b7280"}};
-
-function getFlag(name) {{ return FLAGS[name] || '🏳'; }}
+const FLAGS = {fj};
+const CODES = {cj};
 
 /* Hooks de edición: no-op en el HTML estático; el modo interactivo
-   (app.py) los redefine más abajo para inyectar los botones ✏️/🗑️. */
+   (app.py) los redefine para inyectar los botones ✏️/🗑️. */
 let editGroupControls = r => '';
 let editKoControls = m => '';
 {edit_js}
-
-function showTab(id, el) {{
-  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-  el.classList.add('active');
-}}
-
-/* ── Groups ── */
-function renderGroups() {{
-  const c = document.getElementById('groupsContainer');
-  GROUPS_DATA.forEach(group => {{
-    const card = document.createElement('div');
-    card.className = 'group-card';
-    const rows = group.standings.map((t,i) => {{
-      const rc = i<2?'qualified':(i===2?'qualified-3rd':'');
-      const cc = CONF_COLORS[t.confederation]||'#6b7280';
-      const mc = t.mc_clasif||0;
-      const mcCls = mc>60?'mc-pct':'mc-pct low';
-      return `<tr class="${{rc}}">
-        <td><div class="team-name">
-          <span class="conf-badge" style="background:${{cc}}">${{t.confederation?.substring(0,3)}}</span>
-          ${{t.flag}}${{t.is_host?' 🏠':''}} ${{t.name_es}}
-        </div></td>
-        <td>${{t.w}}</td><td>${{t.d}}</td><td>${{t.l}}</td>
-        <td>${{t.gf}}</td><td>${{t.ga}}</td><td>${{t.gf-t.ga>0?'+':''}}${{t.gf-t.ga}}</td>
-        <td class="pts">${{t.pts}}</td>
-        <td class="${{mcCls}}">${{mc}}%</td>
-      </tr>`;
-    }}).join('');
-    const matchRows = group.results.map(r => {{
-      const manualClass = r.manual ? ' match-manual' : '';
-      const manualIcon  = r.manual ? `<span class="manual-icon" title="Resultado fijado manualmente">✏️</span>` : '';
-      const evBadge     = r.exp_pts != null ? `<span class="ev-badge">EV ${{r.exp_pts.toFixed(1)}}</span>` : '';
-      return `
-      <div class="match-row${{manualClass}}">
-        <div class="match-teams">
-          <span class="match-home">${{r.home}}</span>
-          <span class="match-score">${{r.score}}${{evBadge}}</span>
-          <span class="match-away">${{r.away}}</span>
-        </div>
-        <span class="match-meta">${{r.prob_h}}·${{r.prob_d}}·${{r.prob_a}}${{r.host_team?`<span style="color:var(--host)"> 🏠${{r.host_team}}</span>`:''}}</span>
-        ${{manualIcon}}${{editGroupControls(r)}}
-      </div>`;
-    }}).join('');
-    card.innerHTML = `
-      <div class="group-header">
-        <span class="group-letter">${{group.group}}</span>
-        <span style="color:var(--muted);font-size:.82rem">${{group.standings.map(t=>t.flag+' '+t.name_es).join(' · ')}}</span>
-      </div>
-      <table class="standings-table">
-        <thead><tr><th>Equipo</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>DG</th><th>PTS</th><th>MC%</th></tr></thead>
-        <tbody>${{rows}}</tbody>
-      </table>
-      <div class="third-note">🔶 3° puede clasificar como mejor tercero · MC% = % clasif. directo (Monte Carlo)</div>
-      <div class="matches-section">
-        <h4>Partidos (Local% · Empate% · Visit%)</h4>
-        ${{matchRows}}
-      </div>`;
-    c.appendChild(card);
-  }});
-}}
-
-/* ── Champion odds ── */
-function renderChampionCard() {{
-  const odds = BRACKET_DATA.mc_odds;
-  const champion = BRACKET_DATA.champion_es;
-  const champFlag = getFlag(BRACKET_DATA.champion);
-  const maxProb = odds[0]?.prob || 1;
-
-  const top8 = odds.slice(0, 8);
-  const col1 = top8.slice(0, 4);
-  const col2 = top8.slice(4, 8);
-
-  function makeOddsRows(list) {{
-    return list.map(t => `
-      <div class="odds-team">
-        <span class="odds-flag">${{getFlag(t.name)}}</span>
-        <span class="odds-name">${{t.name_es}}</span>
-        <span class="odds-prob">${{t.prob}}%</span>
-      </div>
-      <div class="odds-bar-bg"><div class="odds-bar-fill" style="width:${{(t.prob/maxProb*100).toFixed(1)}}%"></div></div>
-    `).join('');
-  }}
-
-  document.getElementById('championCard').innerHTML = `
-    <div style="display:flex;align-items:center;gap:1rem">
-      <div class="champion-trophy">🏆</div>
-      <div class="champion-info">
-        <h2>${{champFlag}} ${{champion}}</h2>
-        <p>Campeón predicho · ${{(odds.find(t=>t.name===BRACKET_DATA.champion)||{{prob:0}}).prob}}% MC</p>
-        <p style="font-size:.75rem;margin-top:.3rem">Monte Carlo 20k · λ×0.90 eliminatoria</p>
-      </div>
-    </div>
-    <div class="odds-grid">
-      <div class="odds-row">${{makeOddsRows(col1)}}</div>
-      <div class="odds-row">${{makeOddsRows(col2)}}</div>
-    </div>`;
-}}
-
-/* ── Bracket visual ── */
-function renderBracket() {{
-  const ROUNDS  = ['R32','R16','QF','SF','Final'];
-  const LABELS  = {{R32:'Dieciseisavos',R16:'Octavos',QF:'Cuartos',SF:'Semis',Final:'Final 🏆'}};
-  const SPANS   = {{R32:1,R16:2,QF:4,SF:8,Final:16}};
-  const SLOT    = 60;   // px per R32 slot
-  const CARD_H  = 56;   // px card height
-  const TOTAL   = 16 * SLOT;
-  const HDR_H   = 32;
-
-  const container = document.getElementById('bracketRounds');
-
-  function sectionClass(round, idx) {{
-    if (round==='SF') return 'sec-sf';
-    if (round==='Final') return 'sec-final';
-    const n = BRACKET_DATA.rounds[round].length;
-    const s = Math.floor(idx / (n / 4));
-    return ['sec-a','sec-b','sec-c','sec-d'][Math.min(s,3)];
-  }}
-
-  ROUNDS.forEach(round => {{
-    const col  = document.createElement('div');
-    col.className = 'round-col';
-
-    const hdr = document.createElement('div');
-    hdr.className = 'round-header';
-    hdr.textContent = LABELS[round];
-    col.appendChild(hdr);
-
-    const body = document.createElement('div');
-    body.className = 'round-body';
-    body.style.height = TOTAL + 'px';
-
-    const matches = BRACKET_DATA.rounds[round];
-    const span    = SPANS[round];
-
-    matches.forEach((m, i) => {{
-      const centerY = (span * i + span / 2) * SLOT;
-      const top     = Math.round(centerY - CARD_H / 2);
-
-      const card = document.createElement('div');
-      card.className = `ko-card ${{sectionClass(round, i)}}`;
-      card.style.top  = top + 'px';
-      card.style.height = CARD_H + 'px';
-
-      const hw = m.winner === m.home;
-      const aw = m.winner === m.away;
-      const scoreDisp = m.went_et
-        ? `<span>${{m.score}}</span> <span style="color:var(--muted);font-weight:400">(pen: ${{m.advancer_es}})</span>`
-        : `<span>${{m.score}}</span>`;
-      const evDisp    = m.exp_pts != null ? `<span class="ko-ev">EV ${{m.exp_pts.toFixed(1)}}</span>` : '';
-      const manualCls = m.manual ? ' ko-manual' : '';
-      const manualIcon = m.manual ? ` <span title="Resultado fijado manualmente" style="font-size:.65rem">✏️</span>` : '';
-
-      card.className += manualCls;
-
-      card.innerHTML = `
-        <div class="ko-team ${{hw?'winner':''}}">
-          <span class="ko-flag">${{getFlag(m.home)}}</span>
-          <span class="ko-name">${{m.home_es}}</span>
-          <span class="ko-pct">${{m.prob_h}}%</span>
-        </div>
-        <div class="ko-divider"></div>
-        <div class="ko-team ${{aw?'winner':''}}">
-          <span class="ko-flag">${{getFlag(m.away)}}</span>
-          <span class="ko-name">${{m.away_es}}</span>
-          <span class="ko-pct">${{m.prob_a}}%</span>
-        </div>
-        <div class="ko-score">${{scoreDisp}}${{evDisp}}${{manualIcon}} <span style="color:var(--muted)">·</span> E${{m.prob_d}}%${{editKoControls(m)}}</div>`;
-
-      card.title = `${{m.home_es}} vs ${{m.away_es}} | ${{m.score}}${{m.went_et?` (pen: ${{m.advancer_es}})`:''}} | L:${{m.prob_h}}% E:${{m.prob_d}}% V:${{m.prob_a}}%${{m.manual?' | ✏️ Manual':''}} | EV ${{m.exp_pts}}`;
-
-      body.appendChild(card);
-    }});
-
-    col.appendChild(body);
-    container.appendChild(col);
-  }});
-}}
-
-renderGroups();
-renderChampionCard();
-renderBracket();
+{BASE_JS}
 </script>
 </body>
 </html>"""
