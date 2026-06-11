@@ -48,17 +48,48 @@ TEAM_CODES = {
 HOST_TEAMS = {"Mexico","USA","Canada"}
 
 # ---------------------------------------------------------------------------
+# Íconos Lucide (lucide.dev, ISC) incrustados como SVG inline — sin CDN, el
+# dashboard sigue siendo un único HTML que funciona offline. Las banderas de
+# países se mantienen como emojis (Lucide no tiene banderas).
+# ---------------------------------------------------------------------------
+LUCIDE = {
+    "ball":         '<path d="M11 7a16 16 20 0 1 10.98 4.362"/><path d="M12 12a13 13 0 0 1-8.66 5"/><path d="M16.83 13.634a16 16 0 0 1-9.267 7.328"/><path d="M20.66 17A13 13 0 0 0 12 12a13 13 0 0 1 0-10"/><path d="M8.17 15.366a16 16 0 0 1-1.713-11.69"/><circle cx="12" cy="12" r="10"/>',
+    "trophy":       '<path d="M10 14.66v1.626a2 2 0 0 1-.976 1.696A5 5 0 0 0 7 21.978"/><path d="M14 14.66v1.626a2 2 0 0 0 .976 1.696A5 5 0 0 1 17 21.978"/><path d="M18 9h1.5a1 1 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z"/><path d="M6 9H4.5a1 1 0 0 1 0-5H6"/>',
+    "pencil":       '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>',
+    "trash":        '<path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+    "check":        '<path d="M20 6 9 17l-5-5"/>',
+    "circle-check": '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+    "house":        '<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    "target":       '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+    "refresh":      '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+}
+
+
+def _icon(name, cls=""):
+    """SVG inline de un ícono Lucide para las partes estáticas del HTML.
+    (El JS tiene su propio helper icon() con el mismo dict inyectado.)"""
+    c = ("lc " + cls).strip()
+    return (f'<svg class="{c}" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+            f'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" '
+            f'aria-hidden="true">{LUCIDE[name]}</svg>')
+
+# ---------------------------------------------------------------------------
 # UI de edición (solo modo interactivo, servida por app.py)
 # ---------------------------------------------------------------------------
 EDIT_CSS = """
 /* ── UI de edición (modo interactivo) ── */
 .edit-bar{position:fixed;top:.8rem;right:.8rem;z-index:1000;display:flex;align-items:center;gap:.5rem;background:rgba(30,41,59,.92);border:1px solid var(--border);border-radius:999px;padding:.3rem .5rem .3rem .9rem;font-size:.74rem;color:var(--muted);box-shadow:0 4px 16px rgba(0,0,0,.35);backdrop-filter:blur(8px)}
-.edit-bar button{background:transparent;color:var(--text);border:1px solid var(--border);border-radius:999px;padding:.22rem .75rem;font-size:.72rem;cursor:pointer;transition:border-color .15s ease,color .15s ease,transform .12s ease}
+.edit-bar span{display:inline-flex;align-items:center;gap:.3rem}
+.edit-bar button{display:inline-flex;align-items:center;gap:.35rem;background:transparent;color:var(--text);border:1px solid var(--border);border-radius:999px;padding:.22rem .75rem;font-size:.72rem;cursor:pointer;transition:border-color .15s ease,color .15s ease,transform .12s ease}
 .edit-bar button:hover{border-color:var(--accent);color:var(--accent)}
 .edit-bar button:active{transform:scale(.96)}
 .edit-bar button:disabled{opacity:.5;cursor:wait}
-.edit-btn{background:none;border:none;cursor:pointer;font-size:.72rem;padding:0 .1rem;opacity:0;transition:opacity .15s ease;line-height:1}
-.match-block:hover .edit-btn,.ko-card:hover .edit-btn{opacity:.75}
+.edit-btn{background:none;border:none;cursor:pointer;padding:0 .1rem;color:var(--muted);opacity:0;transition:opacity .15s ease,color .15s ease;line-height:1}
+.edit-btn .lc{width:.9rem;height:.9rem;vertical-align:middle}
+.edit-btn:hover{color:var(--text)}
+.edit-btn.btn-ok:hover{color:var(--green)}
+.edit-btn.btn-del:hover{color:var(--red)}
+.match-block:hover .edit-btn,.ko-card:hover .edit-btn{opacity:.8}
 .edit-btn:hover{opacity:1!important}
 @media (hover:none){.edit-btn{opacity:.55}}
 @media (max-width:700px){.edit-bar{top:auto;bottom:.8rem;right:.8rem}}
@@ -68,7 +99,7 @@ EDIT_CSS = """
 .modal-overlay.open{opacity:1;pointer-events:auto}
 .modal{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.3rem 1.5rem;width:min(92vw,360px);box-shadow:0 16px 48px rgba(0,0,0,.5);transform:scale(.96);opacity:0;transition:transform .18s cubic-bezier(0.23,1,0.32,1),opacity .18s ease}
 .modal-overlay.open .modal{transform:scale(1);opacity:1}
-.modal-kind{font-size:.66rem;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;margin-bottom:.3rem}
+.modal-kind{display:inline-flex;align-items:center;gap:.35rem;font-size:.66rem;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;margin-bottom:.3rem}
 .modal-kind.k-bet{color:var(--accent)}
 .modal-kind.k-result{color:var(--green)}
 .modal h3{font-size:1rem;margin-bottom:1.1rem;font-weight:600}
@@ -108,12 +139,12 @@ const MATCH_REG = [];
 function regControls(entry) {
   const i = MATCH_REG.push(entry) - 1;
   if (entry.played) {
-    return `<button class="edit-btn" title="Editar resultado real" onclick="openDlg(${i},'result')">✏️</button>` +
-           `<button class="edit-btn" title="Quitar resultado real" onclick="delEntry(${i},'result')">🗑️</button>`;
+    return `<button class="edit-btn" title="Editar resultado real" onclick="openDlg(${i},'result')">${icon('pencil')}</button>` +
+           `<button class="edit-btn btn-del" title="Quitar resultado real" onclick="delEntry(${i},'result')">${icon('trash')}</button>`;
   }
-  return `<button class="edit-btn" title="Ingresar resultado real" onclick="openDlg(${i},'result')">✅</button>` +
-         `<button class="edit-btn" title="Editar apuesta" onclick="openDlg(${i},'bet')">✏️</button>` +
-         (entry.manual ? `<button class="edit-btn" title="Borrar apuesta manual" onclick="delEntry(${i},'bet')">🗑️</button>` : '');
+  return `<button class="edit-btn btn-ok" title="Ingresar resultado real" onclick="openDlg(${i},'result')">${icon('circle-check')}</button>` +
+         `<button class="edit-btn" title="Editar apuesta" onclick="openDlg(${i},'bet')">${icon('pencil')}</button>` +
+         (entry.manual ? `<button class="edit-btn btn-del" title="Borrar apuesta manual" onclick="delEntry(${i},'bet')">${icon('trash')}</button>` : '');
 }
 
 editGroupControls = r => regControls({
@@ -208,7 +239,8 @@ function syncAdvRow() {
 function openDlg(idx, kind) {
   const e = MATCH_REG[idx];
   DLG.entry = e; DLG.kind = kind; DLG.idx = idx; DLG.adv = null;
-  document.getElementById('mKind').textContent = kind === 'result' ? '✅ Resultado real' : '✏️ Apuesta manual';
+  document.getElementById('mKind').innerHTML = kind === 'result'
+    ? `${icon('circle-check')} Resultado real` : `${icon('pencil')} Apuesta manual`;
   document.getElementById('mKind').className = 'modal-kind ' + (kind === 'result' ? 'k-result' : 'k-bet');
   document.getElementById('mTitle').textContent = `${e.homeEs} vs ${e.awayEs}`;
   document.getElementById('mFlagH').textContent = getFlag(e.home);
@@ -285,10 +317,10 @@ async function clearAllOverrides() {
 
 async function recalcMC() {
   const btn = document.getElementById('recalcBtn');
-  btn.disabled = true; btn.textContent = 'Recalculando…';
+  btn.disabled = true; btn.innerHTML = `${icon('refresh')} Recalculando…`;
   const r = await apiPost('/api/recalc-mc', {});
   if (!r.error) { location.reload(); return; }
-  btn.disabled = false; btn.textContent = 'Recalcular';
+  btn.disabled = false; btn.innerHTML = `${icon('refresh')} Recalcular`;
   alert('Error: ' + r.error);
 }
 
@@ -299,10 +331,10 @@ async function recalcMC() {
   Object.values(BRACKET_DATA.rounds).forEach(ms => ms.forEach(m => { if (m.manual) n++; if (m.played) p++; }));
   const bar = document.createElement('div');
   bar.className = 'edit-bar';
-  bar.innerHTML = `<span title="Resultados reales ingresados">✅ ${p}</span>
-    <span title="Apuestas fijadas a mano">✏️ ${n}</span>
+  bar.innerHTML = `<span title="Resultados reales ingresados">${icon('circle-check', 'lc-green')} ${p}</span>
+    <span title="Apuestas fijadas a mano">${icon('pencil')} ${n}</span>
     ${n > 0 ? '<button onclick="clearAllOverrides()">Limpiar apuestas</button>' : ''}
-    <button id="recalcBtn" onclick="recalcMC()" title="Recalcular Monte Carlo del bracket">Recalcular</button>`;
+    <button id="recalcBtn" onclick="recalcMC()" title="Recalcular Monte Carlo del bracket">${icon('refresh')} Recalcular</button>`;
   document.body.appendChild(bar);
 })();
 """
@@ -320,6 +352,13 @@ BASE_CSS = """
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif}
+
+/* ── Íconos Lucide ── */
+.lc{width:1em;height:1em;display:inline-block;vertical-align:-0.125em;flex-shrink:0}
+.lc-accent{color:var(--accent)}
+.lc-green{color:var(--green)}
+.lc-host{color:var(--host);width:.85em;height:.85em}
+.lc-title{width:1.45rem;height:1.45rem;color:var(--accent);vertical-align:-0.18em}
 header{padding:2.2rem 1rem 1.4rem;text-align:center}
 header h1{font-size:1.7rem;font-weight:700;letter-spacing:.5px}
 header h1 em{font-style:normal;color:var(--accent)}
@@ -378,13 +417,15 @@ header p{color:var(--muted);margin-top:.35rem;font-size:.85rem}
 
 /* ── Puntos polla (resumen) ── */
 .points-strip{display:flex;justify-content:center;align-items:center;gap:1.8rem;background:linear-gradient(135deg,rgba(16,185,129,.10),rgba(245,158,11,.06));border:1px solid rgba(16,185,129,.35);border-radius:10px;padding:.6rem 1.2rem;margin-bottom:1.4rem;font-size:.84rem;color:var(--muted);flex-wrap:wrap}
+.points-strip span{display:inline-flex;align-items:center;gap:.4rem}
 .points-strip b{color:var(--text);font-size:1rem}
 .points-strip .ps-total b{color:var(--green);font-size:1.15rem}
 
 /* ── Campeón ── */
 .champion-card{background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(16,185,129,.05));border:1px solid var(--accent);border-radius:12px;padding:1.2rem 1.6rem;margin-bottom:1.6rem;display:flex;align-items:center;gap:2.5rem;flex-wrap:wrap}
 .champion-info{display:flex;align-items:center;gap:1rem}
-.champion-trophy{font-size:2.2rem}
+.champion-trophy{display:flex}
+.champion-trophy .lc{width:2.3rem;height:2.3rem}
 .champion-info h2{font-size:1.25rem;color:var(--accent)}
 .champion-info p{color:var(--muted);font-size:.8rem;margin-top:.2rem}
 .odds-grid{display:flex;gap:1.5rem;flex-wrap:wrap;flex:1}
@@ -461,6 +502,9 @@ BASE_JS = r"""
 function getFlag(name) { return FLAGS[name] || '🏳'; }
 function getCode(name) { return CODES[name] || (name || '').substring(0, 3).toUpperCase(); }
 function ptsClass(p) { return p >= 4 ? 'pts-hi' : p >= 3 ? 'pts-mid' : p >= 1 ? 'pts-low' : 'pts-zero'; }
+function icon(name, cls) {
+  return `<svg class="lc${cls ? ' ' + cls : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${LUCIDE[name]}</svg>`;
+}
 
 function showTab(id, el) {
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
@@ -480,7 +524,7 @@ function renderGroups() {
       const mc = t.mc_clasif || 0;
       const mcCls = mc > 60 ? 'mc-pct' : 'mc-pct low';
       return `<tr class="${rc}">
-        <td><div class="team-name">${t.flag} ${t.name_es}${t.is_host ? ' 🏠' : ''}</div></td>
+        <td><div class="team-name">${t.flag} ${t.name_es}${t.is_host ? ' ' + icon('house', 'lc-host') : ''}</div></td>
         <td>${t.w}</td><td>${t.d}</td><td>${t.l}</td>
         <td>${t.gf}</td><td>${t.ga}</td><td>${t.gf - t.ga > 0 ? '+' : ''}${t.gf - t.ga}</td>
         <td class="pts">${t.pts}</td>
@@ -492,7 +536,7 @@ function renderGroups() {
       const hostAway = r.host_team && r.away_raw.startsWith(r.host_team);
       let probsRow, scoreCls = 'm-score', sub, title;
       if (r.played) {
-        probsRow = `<span class="m-prob ph"></span><span class="m-tag" style="text-align:center">✓ jugado</span><span class="m-prob pa"></span>`;
+        probsRow = `<span class="m-prob ph"></span><span class="m-tag" style="text-align:center">${icon('check')} jugado</span><span class="m-prob pa"></span>`;
         scoreCls += ' real';
         sub = r.bet
           ? `<span class="m-bet">Apuesta ${r.bet}</span> <span class="pts-badge ${ptsClass(r.points)}">+${r.points}</span>`
@@ -504,16 +548,16 @@ function renderGroups() {
         <span class="m-prob pd">${Math.round(r.prob_d)}%</span>
         <span class="m-prob pa">${Math.round(r.prob_a)}%</span>`;
         const ev = r.exp_pts != null ? `EV ${r.exp_pts.toFixed(1)}` : '';
-        const manual = r.manual ? ' <span title="Apuesta fijada manualmente">✏️</span>' : '';
+        const manual = r.manual ? ` <span title="Apuesta fijada manualmente">${icon('pencil')}</span>` : '';
         sub = `${ev}${manual}`;
         title = `${r.home} vs ${r.away} · Local ${r.prob_h}% · Empate ${r.prob_d}% · Visita ${r.prob_a}%`;
       }
       return `
       <div class="match-block${r.manual ? ' match-manual' : ''}" title="${title}">
         ${probsRow}
-        <span class="m-team home">${getCode(r.home_raw)}${hostHome ? ' 🏠' : ''} <span class="m-flag">${getFlag(r.home_raw)}</span></span>
+        <span class="m-team home">${getCode(r.home_raw)}${hostHome ? ' ' + icon('house', 'lc-host') : ''} <span class="m-flag">${getFlag(r.home_raw)}</span></span>
         <span class="${scoreCls}">${r.score}</span>
-        <span class="m-team away"><span class="m-flag">${getFlag(r.away_raw)}</span> ${getCode(r.away_raw)}${hostAway ? ' 🏠' : ''}</span>
+        <span class="m-team away"><span class="m-flag">${getFlag(r.away_raw)}</span> ${getCode(r.away_raw)}${hostAway ? ' ' + icon('house', 'lc-host') : ''}</span>
         <span class="m-sub">${sub}</span>
         <span class="m-actions">${editGroupControls(r)}</span>
       </div>`;
@@ -544,7 +588,7 @@ function renderChampionCard() {
     <div class="odds-bar-bg"><div class="odds-bar-fill" style="width:${(t.prob / maxProb * 100).toFixed(1)}%"></div></div>`).join('');
   document.getElementById('championCard').innerHTML = `
     <div class="champion-info">
-      <div class="champion-trophy">🏆</div>
+      <div class="champion-trophy">${icon('trophy', 'lc-accent')}</div>
       <div>
         <h2>${getFlag(BRACKET_DATA.champion)} ${BRACKET_DATA.champion_es}</h2>
         <p>Campeón predicho · ${champProb}% de probabilidad</p>
@@ -564,10 +608,10 @@ function koCardHTML(m) {
   if (m.played) {
     extra = m.points != null
       ? ` <span class="pts-badge ${ptsClass(m.points)}">+${m.points}</span>`
-      : ' <span class="m-tag">✓</span>';
+      : ` <span class="m-tag">${icon('check')}</span>`;
   } else {
     extra = (m.exp_pts != null ? ` <span class="ko-ev">EV ${m.exp_pts.toFixed(1)}</span>` : '') +
-            (m.manual ? ' ✏️' : '');
+            (m.manual ? ` ${icon('pencil')}` : '');
   }
   const pct = side => m.played ? '' : `<span class="ko-pct">${side}%</span>`;
   return `
@@ -683,11 +727,11 @@ function renderBracket() {
 function renderBracketList() {
   const list = document.getElementById('bracketList');
   const ORDER = [['R32', '16avos de final'], ['R16', 'Octavos de final'],
-                 ['QF', 'Cuartos de final'], ['SF', 'Semifinales'], ['Final', 'Final 🏆']];
+                 ['QF', 'Cuartos de final'], ['SF', 'Semifinales'], ['Final', 'Final']];
   ORDER.forEach(([key, label]) => {
     const t = document.createElement('div');
     t.className = 'bkl-title';
-    t.textContent = label;
+    t.innerHTML = key === 'Final' ? `${icon('trophy', 'lc-accent')} ${label}` : label;
     list.appendChild(t);
     BRACKET_DATA.rounds[key].forEach(m => {
       const card = document.createElement('div');
@@ -712,7 +756,7 @@ function renderPointsStrip() {
   if (gn + kn === 0) { el.hidden = true; return; }
   el.hidden = false;
   const j = n => `${n} jugado${n === 1 ? '' : 's'}`;
-  el.innerHTML = `<span class="ps-total">🎯 Puntos polla: <b>${gp + kp}</b></span>
+  el.innerHTML = `<span class="ps-total">${icon('target', 'lc-green')} Puntos polla: <b>${gp + kp}</b></span>
     <span>Grupos: <b>${gp}</b> · ${j(gn)}</span>` +
     (kn ? `<span>Eliminatoria: <b>${kp}</b> · ${j(kn)}</span>` : '');
 }
@@ -733,6 +777,7 @@ def build_html(groups_data, bracket_data, interactive=False):
     bj = json.dumps(bracket_data, ensure_ascii=False)
     fj = json.dumps(FLAG_EMOJIS, ensure_ascii=False)
     cj = json.dumps(TEAM_CODES, ensure_ascii=False)
+    lj = json.dumps(LUCIDE, ensure_ascii=False)
     edit_css = EDIT_CSS if interactive else ""
     edit_js  = EDIT_JS if interactive else ""
 
@@ -746,7 +791,7 @@ def build_html(groups_data, bracket_data, interactive=False):
 </head>
 <body>
 <header>
-  <h1>⚽ Polla <em>Mundial 2026</em></h1>
+  <h1>{_icon("ball", "lc-title")} Polla <em>Mundial 2026</em></h1>
   <p>Simulador de predicciones · Monte Carlo 20.000 simulaciones</p>
 </header>
 
@@ -798,7 +843,7 @@ def build_html(groups_data, bracket_data, interactive=False):
       El modelo elige el marcador (y en eliminatoria, quién avanza) que <em>maximiza los puntos
       esperados</em> según el reglamento de la polla. Esto reemplaza la heurística del
       "resultado dominante" de v3.2. El EV mostrado refleja cuántos puntos se esperan ganar
-      en promedio con esa apuesta. Los overrides manuales permiten fijar cualquier marcador (✏️).</p>
+      en promedio con esa apuesta. Los overrides manuales permiten fijar cualquier marcador ({_icon("pencil")}).</p>
     </div>
   </div>
 
@@ -813,11 +858,11 @@ def build_html(groups_data, bracket_data, interactive=False):
       <li><b>Clasif</b> — probabilidad de terminar 1° o 2° del grupo (Monte Carlo).</li>
       <li><b>Fila verde</b> — clasifica directo a 16avos (1° y 2° del grupo).</li>
       <li><b>Fila ámbar</b> — puede clasificar como uno de los 8 mejores terceros.</li>
-      <li><b>🏠</b> — anfitrión jugando de local (México +20% · USA +13% · Canadá +10%).</li>
-      <li><b>✏️</b> — apuesta fijada manualmente por ti.</li>
-      <li><b>✅ / marcador verde</b> — resultado real de un partido ya jugado; el modelo re-simula solo lo pendiente.</li>
+      <li><b>{_icon("house", "lc-host")}</b> — anfitrión jugando de local (México +20% · USA +13% · Canadá +10%).</li>
+      <li><b>{_icon("pencil")}</b> — apuesta fijada manualmente por ti.</li>
+      <li><b>{_icon("circle-check", "lc-green")} / marcador verde</b> — resultado real de un partido ya jugado; el modelo re-simula solo lo pendiente.</li>
       <li><b>Apuesta X-Y · +N</b> — en partidos jugados: tu apuesta congelada y los puntos de polla que ganó.</li>
-      <li><b>🎯 Puntos polla</b> — suma de los puntos obtenidos en todos los partidos jugados.</li>
+      <li><b>{_icon("target", "lc-green")} Puntos polla</b> — suma de los puntos obtenidos en todos los partidos jugados.</li>
       <li><b>pen XXX</b> — empate en 90 minutos; ese equipo avanza por prórroga o penales.</li>
       <li><b>Puntos en grupos</b> — 6 marcador exacto · 4 ganador + goles de un equipo · 3 ganador · 1 goles de un equipo.</li>
       <li><b>Puntos en eliminatoria</b> — 9 exacto · 6 ganador + goles · 6 acertar quién avanza · 3 goles de un equipo en empates.</li>
@@ -832,6 +877,7 @@ const GROUPS_DATA = {gj};
 const BRACKET_DATA = {bj};
 const FLAGS = {fj};
 const CODES = {cj};
+const LUCIDE = {lj};
 
 /* Hooks de edición: no-op en el HTML estático; el modo interactivo
    (app.py) los redefine para inyectar los botones ✏️/🗑️. */
