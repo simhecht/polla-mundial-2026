@@ -1,4 +1,29 @@
 {
-  "groups": [],
+  "groups": [
+    {
+      "home": "Mexico",
+      "away": "South Africa",
+      "score": [
+        2,
+        0
+      ],
+      "bet": [
+        2,
+        0
+      ]
+    },
+    {
+      "home": "South Korea",
+      "away": "Czechia",
+      "score": [
+        2,
+        1
+      ],
+      "bet": [
+        2,
+        1
+      ]
+    }
+  ],
   "ko": []
 }
