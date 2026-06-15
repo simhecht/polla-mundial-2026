@@ -1,54 +1,6 @@
 {
   "groups": [
     {
-      "home": "Brazil",
-      "away": "Morocco",
-      "score": [
-        2,
-        2
-      ]
-    },
-    {
-      "home": "Haiti",
-      "away": "Scotland",
-      "score": [
-        0,
-        3
-      ]
-    },
-    {
-      "home": "Brazil",
-      "away": "Haiti",
-      "score": [
-        4,
-        0
-      ]
-    },
-    {
-      "home": "Morocco",
-      "away": "Haiti",
-      "score": [
-        3,
-        0
-      ]
-    },
-    {
-      "home": "Ecuador",
-      "away": "Curacao",
-      "score": [
-        3,
-        0
-      ]
-    },
-    {
-      "home": "Ecuador",
-      "away": "Germany",
-      "score": [
-        2,
-        2
-      ]
-    },
-    {
       "home": "Sweden",
       "away": "Tunisia",
       "score": [
@@ -81,6 +33,14 @@
       ]
     },
     {
+      "home": "South Africa",
+      "away": "South Korea",
+      "score": [
+        0,
+        2
+      ]
+    },
+    {
       "home": "Jordan",
       "away": "Argentina",
       "score": [
@@ -97,15 +57,5 @@
       ]
     }
   ],
-  "ko": [
-    {
-      "home": "Spain",
-      "away": "Argentina",
-      "score": [
-        1,
-        1
-      ],
-      "advancer": "Spain"
-    }
-  ]
+  "ko": []
 }
