@@ -131,6 +131,150 @@
         2,
         2
       ]
+    },
+    {
+      "home": "Sweden",
+      "away": "Tunisia",
+      "score": [
+        5,
+        1
+      ],
+      "bet": [
+        2,
+        0
+      ]
+    },
+    {
+      "home": "Belgium",
+      "away": "Egypt",
+      "score": [
+        1,
+        1
+      ],
+      "bet": [
+        2,
+        1
+      ]
+    },
+    {
+      "home": "Iran",
+      "away": "New Zealand",
+      "score": [
+        2,
+        2
+      ],
+      "bet": [
+        1,
+        0
+      ]
+    },
+    {
+      "home": "Spain",
+      "away": "Cabo Verde",
+      "score": [
+        0,
+        0
+      ],
+      "bet": [
+        3,
+        0
+      ]
+    },
+    {
+      "home": "France",
+      "away": "Senegal",
+      "score": [
+        3,
+        1
+      ],
+      "bet": [
+        2,
+        1
+      ]
+    },
+    {
+      "home": "Iraq",
+      "away": "Norway",
+      "score": [
+        1,
+        4
+      ],
+      "bet": [
+        0,
+        2
+      ]
+    },
+    {
+      "home": "Portugal",
+      "away": "DR Congo",
+      "score": [
+        1,
+        1
+      ],
+      "bet": [
+        3,
+        0
+      ]
+    },
+    {
+      "home": "England",
+      "away": "Croatia",
+      "score": [
+        4,
+        2
+      ],
+      "bet": [
+        2,
+        1
+      ]
+    },
+    {
+      "home": "Ghana",
+      "away": "Panama",
+      "score": [
+        1,
+        0
+      ],
+      "bet": [
+        2,
+        1
+      ]
+    },
+    {
+      "home": "Argentina",
+      "away": "Algeria",
+      "score": [
+        3,
+        1
+      ],
+      "bet": [
+        3,
+        0
+      ]
+    },
+    {
+      "home": "Austria",
+      "away": "Jordan",
+      "score": [
+        3,
+        1
+      ],
+      "bet": [
+        3,
+        0
+      ]
+    },
+    {
+      "home": "Saudi Arabia",
+      "away": "Uruguay",
+      "score": [
+        1,
+        1
+      ],
+      "bet": [
+        1,
+        2
+      ]
     }
   ],
   "ko": []

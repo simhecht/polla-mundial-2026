@@ -52,8 +52,72 @@
       "home": "Ghana",
       "away": "Panama",
       "score": [
+        2,
+        1
+      ]
+    },
+    {
+      "home": "Argentina",
+      "away": "Algeria",
+      "score": [
+        3,
+        0
+      ]
+    },
+    {
+      "home": "Austria",
+      "away": "Jordan",
+      "score": [
+        3,
+        0
+      ]
+    },
+    {
+      "home": "Saudi Arabia",
+      "away": "Uruguay",
+      "score": [
+        1,
+        2
+      ]
+    },
+    {
+      "home": "Mexico",
+      "away": "South Korea",
+      "score": [
+        1,
+        2
+      ]
+    },
+    {
+      "home": "Czechia",
+      "away": "Mexico",
+      "score": [
         1,
         1
+      ]
+    },
+    {
+      "home": "Canada",
+      "away": "Qatar",
+      "score": [
+        1,
+        0
+      ]
+    },
+    {
+      "home": "Uruguay",
+      "away": "Cabo Verde",
+      "score": [
+        1,
+        0
+      ]
+    },
+    {
+      "home": "Cabo Verde",
+      "away": "Saudi Arabia",
+      "score": [
+        1,
+        2
       ]
     }
   ],
