@@ -9,46 +9,6 @@
       ]
     },
     {
-      "home": "Belgium",
-      "away": "Iran",
-      "score": [
-        2,
-        0
-      ]
-    },
-    {
-      "home": "New Zealand",
-      "away": "Egypt",
-      "score": [
-        0,
-        2
-      ]
-    },
-    {
-      "home": "New Zealand",
-      "away": "Belgium",
-      "score": [
-        0,
-        3
-      ]
-    },
-    {
-      "home": "South Africa",
-      "away": "South Korea",
-      "score": [
-        0,
-        2
-      ]
-    },
-    {
-      "home": "Jordan",
-      "away": "Argentina",
-      "score": [
-        0,
-        3
-      ]
-    },
-    {
       "home": "Ghana",
       "away": "Panama",
       "score": [
@@ -89,19 +49,67 @@
       ]
     },
     {
-      "home": "Czechia",
-      "away": "Mexico",
+      "home": "Canada",
+      "away": "Qatar",
+      "score": [
+        2,
+        1
+      ]
+    },
+    {
+      "home": "Scotland",
+      "away": "Morocco",
+      "score": [
+        0,
+        2
+      ]
+    },
+    {
+      "home": "Brazil",
+      "away": "Haiti",
+      "score": [
+        4,
+        0
+      ]
+    },
+    {
+      "home": "USA",
+      "away": "Australia",
+      "score": [
+        3,
+        1
+      ]
+    },
+    {
+      "home": "Turkey",
+      "away": "Paraguay",
       "score": [
         1,
         1
       ]
     },
     {
-      "home": "Canada",
-      "away": "Qatar",
+      "home": "Germany",
+      "away": "Ivory Coast",
       "score": [
-        1,
+        3,
+        1
+      ]
+    },
+    {
+      "home": "Belgium",
+      "away": "Iran",
+      "score": [
+        2,
         0
+      ]
+    },
+    {
+      "home": "New Zealand",
+      "away": "Egypt",
+      "score": [
+        0,
+        2
       ]
     },
     {
@@ -113,8 +121,40 @@
       ]
     },
     {
-      "home": "Cabo Verde",
-      "away": "Saudi Arabia",
+      "home": "Norway",
+      "away": "Senegal",
+      "score": [
+        1,
+        1
+      ]
+    },
+    {
+      "home": "Argentina",
+      "away": "Austria",
+      "score": [
+        3,
+        1
+      ]
+    },
+    {
+      "home": "Jordan",
+      "away": "Argentina",
+      "score": [
+        0,
+        3
+      ]
+    },
+    {
+      "home": "England",
+      "away": "Ghana",
+      "score": [
+        3,
+        1
+      ]
+    },
+    {
+      "home": "Panama",
+      "away": "Croatia",
       "score": [
         1,
         2
