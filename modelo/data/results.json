@@ -563,7 +563,324 @@
         1,
         2
       ]
+    },
+    {
+      "home": "Czechia",
+      "away": "Mexico",
+      "score": [
+        0,
+        3
+      ],
+      "bet": [
+        1,
+        2
+      ]
+    },
+    {
+      "home": "South Africa",
+      "away": "South Korea",
+      "score": [
+        1,
+        0
+      ],
+      "bet": [
+        1,
+        2
+      ]
+    },
+    {
+      "home": "Switzerland",
+      "away": "Canada",
+      "score": [
+        2,
+        1
+      ],
+      "bet": [
+        1,
+        2
+      ]
+    },
+    {
+      "home": "Bosnia",
+      "away": "Qatar",
+      "score": [
+        3,
+        1
+      ],
+      "bet": [
+        1,
+        0
+      ]
+    },
+    {
+      "home": "Scotland",
+      "away": "Brazil",
+      "score": [
+        0,
+        3
+      ],
+      "bet": [
+        1,
+        2
+      ]
+    },
+    {
+      "home": "Morocco",
+      "away": "Haiti",
+      "score": [
+        4,
+        2
+      ],
+      "bet": [
+        2,
+        0
+      ]
+    },
+    {
+      "home": "Turkey",
+      "away": "USA",
+      "score": [
+        3,
+        2
+      ],
+      "bet": [
+        1,
+        3
+      ]
+    },
+    {
+      "home": "Paraguay",
+      "away": "Australia",
+      "score": [
+        0,
+        0
+      ],
+      "bet": [
+        0,
+        1
+      ]
+    },
+    {
+      "home": "Ecuador",
+      "away": "Germany",
+      "score": [
+        2,
+        1
+      ],
+      "bet": [
+        1,
+        2
+      ]
+    },
+    {
+      "home": "Curacao",
+      "away": "Ivory Coast",
+      "score": [
+        0,
+        2
+      ],
+      "bet": [
+        0,
+        2
+      ]
+    },
+    {
+      "home": "Japan",
+      "away": "Sweden",
+      "score": [
+        1,
+        1
+      ],
+      "bet": [
+        2,
+        1
+      ]
+    },
+    {
+      "home": "Tunisia",
+      "away": "Netherlands",
+      "score": [
+        1,
+        3
+      ],
+      "bet": [
+        0,
+        3
+      ]
+    },
+    {
+      "home": "Egypt",
+      "away": "Iran",
+      "score": [
+        1,
+        1
+      ],
+      "bet": [
+        1,
+        0
+      ]
+    },
+    {
+      "home": "New Zealand",
+      "away": "Belgium",
+      "score": [
+        1,
+        5
+      ],
+      "bet": [
+        0,
+        2
+      ]
+    },
+    {
+      "home": "Uruguay",
+      "away": "Spain",
+      "score": [
+        0,
+        1
+      ],
+      "bet": [
+        1,
+        2
+      ]
+    },
+    {
+      "home": "Cabo Verde",
+      "away": "Saudi Arabia",
+      "score": [
+        0,
+        0
+      ],
+      "bet": [
+        1,
+        0
+      ]
+    },
+    {
+      "home": "Norway",
+      "away": "France",
+      "score": [
+        1,
+        4
+      ],
+      "bet": [
+        1,
+        2
+      ]
+    },
+    {
+      "home": "Senegal",
+      "away": "Iraq",
+      "score": [
+        5,
+        0
+      ],
+      "bet": [
+        2,
+        0
+      ]
+    },
+    {
+      "home": "Jordan",
+      "away": "Argentina",
+      "score": [
+        1,
+        3
+      ],
+      "bet": [
+        0,
+        3
+      ]
+    },
+    {
+      "home": "Algeria",
+      "away": "Austria",
+      "score": [
+        3,
+        3
+      ],
+      "bet": [
+        1,
+        2
+      ]
+    },
+    {
+      "home": "DR Congo",
+      "away": "Uzbekistan",
+      "score": [
+        3,
+        1
+      ],
+      "bet": [
+        1,
+        1
+      ]
+    },
+    {
+      "home": "Colombia",
+      "away": "Portugal",
+      "score": [
+        0,
+        0
+      ],
+      "bet": [
+        1,
+        2
+      ]
+    },
+    {
+      "home": "Colombia",
+      "away": "DR Congo",
+      "score": [
+        1,
+        0
+      ],
+      "bet": [
+        2,
+        0
+      ]
+    },
+    {
+      "home": "Croatia",
+      "away": "Ghana",
+      "score": [
+        2,
+        1
+      ],
+      "bet": [
+        1,
+        0
+      ]
+    },
+    {
+      "home": "Panama",
+      "away": "England",
+      "score": [
+        0,
+        2
+      ],
+      "bet": [
+        0,
+        2
+      ]
     }
   ],
-  "ko": []
+  "ko": [
+    {
+      "home": "South Africa",
+      "away": "Canada",
+      "score": [
+        0,
+        1
+      ],
+      "advancer": null,
+      "bet": {
+        "score": [
+          1,
+          2
+        ],
+        "advancer": "Canada"
+      }
+    }
+  ]
 }

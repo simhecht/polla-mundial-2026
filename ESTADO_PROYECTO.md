@@ -104,131 +104,155 @@ La penalización de México (−13%) está fijada por encima del umbral 1 − 1/
 - 500-999m (MTY): ×1.02
 - <500m: ×1.00
 
+### Decisión de diseño: el ELO NO se actualiza con resultados reales (congelado)
+
+El `elo_rating` es un **valor fijo de entrada**, no evoluciona partido a partido. Solo se
+escribe manualmente (`setup_db.py` siembra, `update_all_teams.py` / `update_team.py` editan).
+Ingresar un resultado real (`results.py`) **no toca el ELO**: solo fija el marcador en el
+escenario determinista, condiciona el Monte Carlo (los jugados se fijan, se re-simula lo que
+falta) y congela la apuesta para los puntos de la polla.
+
+**Por qué se deja congelado (decisión, no bug):**
+- Un torneo es corto (máx. 7 partidos). Un ELO bien calibrado pre-torneo predice mejor que
+  uno que reacciona con ruido a 1-2 resultados.
+- El ELO está diseñado para no sobrerreaccionar. Ejemplo real — empate España (1913) vs Cabo
+  Verde (1489): con K=40, `ΔR = 40·(0.5 − 0.92) ≈ −17 pts` → España 1913→1896 (−0.9%). En el
+  λ eso es `(1913/1600)² → (1896/1600)²` ≈ **−1.8%** en el factor de ataque. Casi nada.
+- El riesgo de actualizar en automático es el lado feo: castigar a un equipo por un empate de
+  rotación / partido basura justo antes de una ronda decisiva, sin muestra para promediar el ruido.
+- El efecto del resultado sobre *quién clasifica* (pts, DG, GF, posiciones) ya se captura vía
+  el escenario determinista + Monte Carlo. Lo único que no se mueve es el estimador de fuerza.
+
+**Cuándo SÍ ajustar:** solo cuando un resultado revele información *real* (lesión de figura,
+colapso táctico, equipo sobrevalorado en la carga inicial), y hacerlo **a mano con criterio**:
+`python update_team.py "Spain" --elo 1890 --form <nuevo>`. La fórmula ciega no distingue
+"empate por rotación" de "empate porque está mal de verdad"; el juicio humano sí.
+
 ---
 
 ## 4. Resultados fase de grupos (escenario determinista — apuesta EV)
 
-_(Secciones 4-6b autogeneradas por `modelo/report_md.py` — 10 June 2026. EV = puntos esperados de la apuesta según el reglamento de la polla; ✏️ = resultado fijado manualmente vía `override.py`.)_
+_(Secciones 4-6b autogeneradas por `modelo/report_md.py` — 29 June 2026. EV = puntos esperados de la apuesta según el reglamento de la polla; ✏️ = resultado fijado manualmente vía `override.py`.)_
 
 ### GRUPO A
 | Equipo | G | E | P | GF | GC | DG | PTS |
 |---|---|---|---|---|---|---|---|
-| 🇲🇽 **México** ✅ | 3 | 0 | 0 | 6 | 2 | +4 | **9** |
-| 🇰🇷 **Corea del Sur** ✅ | 2 | 0 | 1 | 5 | 4 | +1 | **6** |
-| 🇨🇿 Chequia | 1 | 0 | 2 | 3 | 4 | -1 | 3 |
-| 🇿🇦 Sudáfrica | 0 | 0 | 3 | 1 | 5 | -4 | 0 |
+| 🇲🇽 **México** ✅ | 3 | 0 | 0 | 6 | 0 | +6 | **9** |
+| 🇿🇦 **Sudáfrica** ✅ | 1 | 1 | 1 | 2 | 3 | -1 | **4** |
+| 🇰🇷 Corea del Sur | 1 | 0 | 2 | 2 | 3 | -1 | 3 |
+| 🇨🇿 Chequia | 0 | 1 | 2 | 2 | 6 | -4 | 1 |
 
-Partidos: México 2-0 Sudáfrica (EV 2.86) | Corea del Sur 2-1 Chequia (EV 1.84) | Chequia 1-0 Sudáfrica (EV 2.12) | México 2-1 Corea del Sur (EV 2.53) | Chequia 1-2 México (EV 2.55) | Sudáfrica 1-2 Corea del Sur (EV 2.14)
+Partidos: México 2-0 Sudáfrica (EV 2.86) | Corea del Sur 2-1 Chequia (EV 1.84) | Chequia 1-1 Sudáfrica (EV 1.63) | México 1-0 Corea del Sur (EV 2.41) | Chequia 0-3 México (EV 2.39) | Sudáfrica 1-0 Corea del Sur (EV 1.39)
 
 ### GRUPO B
 | Equipo | G | E | P | GF | GC | DG | PTS |
 |---|---|---|---|---|---|---|---|
-| 🇨🇦 **Canadá** ✅ | 3 | 0 | 0 | 6 | 2 | +4 | **9** |
-| 🇨🇭 **Suiza** ✅ | 2 | 0 | 1 | 5 | 3 | +2 | **6** |
-| 🇧🇦 Bosnia y Herz. | 1 | 0 | 2 | 3 | 4 | -1 | 3 |
-| 🇶🇦 Catar | 0 | 0 | 3 | 0 | 5 | -5 | 0 |
+| 🇨🇭 **Suiza** ✅ | 2 | 1 | 0 | 7 | 3 | +4 | **7** |
+| 🇨🇦 **Canadá** ✅ | 1 | 1 | 1 | 8 | 3 | +5 | **4** |
+| 🇧🇦 Bosnia y Herz. | 1 | 1 | 1 | 5 | 6 | -1 | 4 |
+| 🇶🇦 Catar | 0 | 1 | 2 | 2 | 10 | -8 | 1 |
 
-Partidos: Canadá 2-1 Bosnia y Herz. (EV 2.49) | Catar 0-2 Suiza (EV 2.9) | Suiza 2-1 Bosnia y Herz. (EV 2.41) | Canadá 2-0 Catar (EV 2.99) | Suiza 1-2 Canadá (EV 1.85) | Bosnia y Herz. 1-0 Catar (EV 2.29)
+Partidos: Canadá 1-1 Bosnia y Herz. (EV 1.45) | Catar 1-1 Suiza (EV 1.3) | Suiza 4-1 Bosnia y Herz. (EV 2.15) | Canadá 6-0 Catar (EV 2.64) | Suiza 2-1 Canadá (EV 1.71) | Bosnia y Herz. 3-1 Catar (EV 2.02)
 
 ### GRUPO C
 | Equipo | G | E | P | GF | GC | DG | PTS |
 |---|---|---|---|---|---|---|---|
-| 🇧🇷 **Brasil** ✅ | 3 | 0 | 0 | 6 | 2 | +4 | **9** |
-| 🇲🇦 **Marruecos** ✅ | 2 | 0 | 1 | 5 | 3 | +2 | **6** |
-| 🏴󠁧󠁢󠁳󠁣󠁴󠁿 Escocia | 1 | 0 | 2 | 4 | 4 | 0 | 3 |
-| 🇭🇹 Haití | 0 | 0 | 3 | 0 | 6 | -6 | 0 |
+| 🇧🇷 **Brasil** ✅ | 2 | 1 | 0 | 7 | 1 | +6 | **7** |
+| 🇲🇦 **Marruecos** ✅ | 2 | 1 | 0 | 6 | 3 | +3 | **7** |
+| 🏴󠁧󠁢󠁳󠁣󠁴󠁿 Escocia | 1 | 0 | 2 | 1 | 4 | -3 | 3 |
+| 🇭🇹 Haití | 0 | 0 | 3 | 2 | 8 | -6 | 0 |
 
-Partidos: Brasil 2-1 Marruecos (EV 2.02) | Haití 0-2 Escocia (EV 2.84) | Escocia 1-2 Marruecos (EV 2.21) | Brasil 2-0 Haití (EV 3.34) | Escocia 1-2 Brasil (EV 2.42) | Marruecos 2-0 Haití (EV 3.18)
+Partidos: Brasil 1-1 Marruecos (EV 1.62) | Haití 0-1 Escocia (EV 2.82) | Escocia 0-1 Marruecos (EV 2.19) | Brasil 3-0 Haití (EV 3.32) | Escocia 0-3 Brasil (EV 2.25) | Marruecos 4-2 Haití (EV 2.52)
 
 ### GRUPO D
 | Equipo | G | E | P | GF | GC | DG | PTS |
 |---|---|---|---|---|---|---|---|
-| 🇺🇸 **Estados Unidos** ✅ | 3 | 0 | 0 | 6 | 2 | +4 | **9** |
-| 🇹🇷 **Turquía** ✅ | 2 | 0 | 1 | 4 | 3 | +1 | **6** |
-| 🇦🇺 Australia | 1 | 0 | 2 | 3 | 4 | -1 | 3 |
-| 🇵🇾 Paraguay | 0 | 0 | 3 | 0 | 4 | -4 | 0 |
+| 🇺🇸 **Estados Unidos** ✅ | 2 | 0 | 1 | 8 | 4 | +4 | **6** |
+| 🇦🇺 **Australia** ✅ | 1 | 1 | 1 | 2 | 2 | 0 | **4** |
+| 🇵🇾 Paraguay | 1 | 1 | 1 | 2 | 4 | -2 | 4 |
+| 🇹🇷 Turquía | 1 | 0 | 2 | 3 | 5 | -2 | 3 |
 
-Partidos: Estados Unidos 2-0 Paraguay (EV 2.54) | Australia 1-2 Turquía (EV 2.01) | Turquía 1-0 Paraguay (EV 2.2) | Estados Unidos 2-1 Australia (EV 2.41) | Turquía 1-2 Estados Unidos (EV 2.19) | Paraguay 0-1 Australia (EV 2.01)
+Partidos: Estados Unidos 4-1 Paraguay (EV 2.28) | Australia 2-0 Turquía (EV 1.37) | Turquía 0-1 Paraguay (EV 1.35) | Estados Unidos 2-0 Australia (EV 2.36) | Turquía 3-2 Estados Unidos (EV 1.17) | Paraguay 0-0 Australia (EV 1.48)
 
 ### GRUPO E
 | Equipo | G | E | P | GF | GC | DG | PTS |
 |---|---|---|---|---|---|---|---|
-| 🇩🇪 **Alemania** ✅ | 3 | 0 | 0 | 7 | 2 | +5 | **9** |
-| 🇪🇨 **Ecuador** ✅ | 2 | 0 | 1 | 5 | 3 | +2 | **6** |
-| 🇨🇮 Costa de Marfil | 1 | 0 | 2 | 4 | 4 | 0 | 3 |
-| 🇨🇼 Curazao | 0 | 0 | 3 | 0 | 7 | -7 | 0 |
+| 🇩🇪 **Alemania** ✅ | 2 | 0 | 1 | 10 | 4 | +6 | **6** |
+| 🇨🇮 **Costa de Marfil** ✅ | 2 | 0 | 1 | 4 | 2 | +2 | **6** |
+| 🇪🇨 Ecuador | 1 | 1 | 1 | 2 | 2 | 0 | 4 |
+| 🇨🇼 Curazao | 0 | 1 | 2 | 1 | 9 | -8 | 1 |
 
-Partidos: Alemania 3-0 Curazao (EV 3.54) | Costa de Marfil 1-2 Ecuador (EV 1.9) | Alemania 2-1 Costa de Marfil (EV 2.55) | Ecuador 2-0 Curazao (EV 3.0) | Ecuador 1-2 Alemania (EV 2.42) | Curazao 0-2 Costa de Marfil (EV 2.95)
+Partidos: Alemania 7-1 Curazao (EV 2.92) | Costa de Marfil 1-0 Ecuador (EV 1.61) | Alemania 2-1 Costa de Marfil (EV 2.55) | Ecuador 0-0 Curazao (EV 1.29) | Ecuador 2-1 Alemania (EV 1.15) | Curazao 0-2 Costa de Marfil (EV 2.95)
 
 ### GRUPO F
 | Equipo | G | E | P | GF | GC | DG | PTS |
 |---|---|---|---|---|---|---|---|
-| 🇳🇱 **Países Bajos** ✅ | 3 | 0 | 0 | 6 | 2 | +4 | **9** |
-| 🇯🇵 **Japón** ✅ | 2 | 0 | 1 | 5 | 3 | +2 | **6** |
-| 🇸🇪 Suecia | 1 | 0 | 2 | 3 | 4 | -1 | 3 |
-| 🇹🇳 Túnez | 0 | 0 | 3 | 0 | 5 | -5 | 0 |
+| 🇳🇱 **Países Bajos** ✅ | 2 | 1 | 0 | 10 | 4 | +6 | **7** |
+| 🇯🇵 **Japón** ✅ | 1 | 2 | 0 | 7 | 3 | +4 | **5** |
+| 🇸🇪 Suecia | 1 | 1 | 1 | 7 | 7 | 0 | 4 |
+| 🇹🇳 Túnez | 0 | 0 | 3 | 2 | 12 | -10 | 0 |
 
-Partidos: Países Bajos 2-1 Japón (EV 1.95) | Suecia 1-0 Túnez (EV 2.34) | Países Bajos 2-1 Suecia (EV 2.3) | Túnez 0-2 Japón (EV 2.66) | Japón 2-1 Suecia (EV 2.22) | Túnez 0-2 Países Bajos (EV 2.87)
+Partidos: Países Bajos 2-2 Japón (EV 1.34) | Suecia 5-1 Túnez (EV 1.94) | Países Bajos 5-1 Suecia (EV 1.98) | Túnez 0-4 Japón (EV 2.41) | Japón 1-1 Suecia (EV 1.49) | Túnez 1-3 Países Bajos (EV 2.61)
 
 ### GRUPO G
 | Equipo | G | E | P | GF | GC | DG | PTS |
 |---|---|---|---|---|---|---|---|
-| 🇧🇪 **Bélgica** ✅ | 3 | 0 | 0 | 5 | 1 | +4 | **9** |
-| 🇪🇬 **Egipto** ✅ | 2 | 0 | 1 | 3 | 2 | +1 | **6** |
-| 🇮🇷 Irán | 1 | 0 | 2 | 1 | 2 | -1 | 3 |
-| 🇳🇿 Nueva Zelanda | 0 | 0 | 3 | 0 | 4 | -4 | 0 |
+| 🇧🇪 **Bélgica** ✅ | 1 | 2 | 0 | 6 | 2 | +4 | **5** |
+| 🇪🇬 **Egipto** ✅ | 1 | 2 | 0 | 5 | 3 | +2 | **5** |
+| 🇮🇷 Irán | 0 | 3 | 0 | 3 | 3 | 0 | 3 |
+| 🇳🇿 Nueva Zelanda | 0 | 1 | 2 | 4 | 10 | -6 | 1 |
 
-Partidos: Bélgica 2-1 Egipto (EV 2.4) | Irán 1-0 Nueva Zelanda (EV 2.54) | Bélgica 1-0 Irán (EV 2.61) | Nueva Zelanda 0-1 Egipto (EV 2.69) | Egipto 1-0 Irán (EV 1.96) | Nueva Zelanda 0-2 Bélgica (EV 3.3)
+Partidos: Bélgica 1-1 Egipto (EV 1.5) | Irán 2-2 Nueva Zelanda (EV 1.26) | Bélgica 0-0 Irán (EV 1.33) | Nueva Zelanda 1-3 Egipto (EV 2.42) | Egipto 1-1 Irán (EV 1.72) | Nueva Zelanda 1-5 Bélgica (EV 2.79)
 
 ### GRUPO H
 | Equipo | G | E | P | GF | GC | DG | PTS |
 |---|---|---|---|---|---|---|---|
-| 🇪🇸 **España** ✅ | 3 | 0 | 0 | 7 | 1 | +6 | **9** |
-| 🇺🇾 **Uruguay** ✅ | 2 | 0 | 1 | 5 | 2 | +3 | **6** |
-| 🇨🇻 Cabo Verde | 1 | 0 | 2 | 1 | 5 | -4 | 3 |
-| 🇸🇦 Arabia Saudita | 0 | 0 | 3 | 0 | 5 | -5 | 0 |
+| 🇪🇸 **España** ✅ | 2 | 1 | 0 | 5 | 0 | +5 | **7** |
+| 🇨🇻 **Cabo Verde** ✅ | 0 | 3 | 0 | 2 | 2 | 0 | **3** |
+| 🇺🇾 Uruguay | 0 | 2 | 1 | 3 | 4 | -1 | 2 |
+| 🇸🇦 Arabia Saudita | 0 | 2 | 1 | 1 | 5 | -4 | 2 |
 
-Partidos: España 3-0 Cabo Verde (EV 3.2) | Arabia Saudita 0-2 Uruguay (EV 2.81) | España 2-0 Arabia Saudita (EV 3.33) | Uruguay 2-0 Cabo Verde (EV 2.78) | Cabo Verde 1-0 Arabia Saudita (EV 1.93) | Uruguay 1-2 España (EV 2.36)
+Partidos: España 0-0 Cabo Verde (EV 0.91) | Arabia Saudita 1-1 Uruguay (EV 1.39) | España 4-0 Arabia Saudita (EV 3.2) | Uruguay 2-2 Cabo Verde (EV 1.1) | Cabo Verde 0-0 Arabia Saudita (EV 1.65) | Uruguay 0-1 España (EV 2.22)
 
 ### GRUPO I
 | Equipo | G | E | P | GF | GC | DG | PTS |
 |---|---|---|---|---|---|---|---|
-| 🇫🇷 **Francia** ✅ | 3 | 0 | 0 | 7 | 2 | +5 | **9** |
-| 🇳🇴 **Noruega** ✅ | 2 | 0 | 1 | 5 | 3 | +2 | **6** |
-| 🇸🇳 Senegal | 1 | 0 | 2 | 4 | 4 | 0 | 3 |
-| 🇮🇶 Irak | 0 | 0 | 3 | 0 | 7 | -7 | 0 |
+| 🇫🇷 **Francia** ✅ | 3 | 0 | 0 | 10 | 2 | +8 | **9** |
+| 🇳🇴 **Noruega** ✅ | 2 | 0 | 1 | 8 | 7 | +1 | **6** |
+| 🇸🇳 Senegal | 1 | 0 | 2 | 8 | 6 | +2 | 3 |
+| 🇮🇶 Irak | 0 | 0 | 3 | 1 | 12 | -11 | 0 |
 
-Partidos: Francia 2-1 Senegal (EV 2.46) | Irak 0-2 Noruega (EV 3.11) | Francia 3-0 Irak (EV 3.44) | Noruega 2-1 Senegal (EV 2.0) | Noruega 1-2 Francia (EV 2.26) | Senegal 2-0 Irak (EV 2.93)
+Partidos: Francia 3-1 Senegal (EV 2.35) | Irak 1-4 Noruega (EV 2.8) | Francia 3-0 Irak (EV 3.44) | Noruega 3-2 Senegal (EV 1.74) | Noruega 1-4 Francia (EV 2.02) | Senegal 5-0 Irak (EV 2.61)
 
 ### GRUPO J
 | Equipo | G | E | P | GF | GC | DG | PTS |
 |---|---|---|---|---|---|---|---|
-| 🇦🇷 **Argentina** ✅ | 3 | 0 | 0 | 6 | 1 | +5 | **9** |
-| 🇦🇹 **Austria** ✅ | 2 | 0 | 1 | 5 | 3 | +2 | **6** |
-| 🇩🇿 Argelia | 1 | 0 | 2 | 2 | 4 | -2 | 3 |
-| 🇯🇴 Jordania | 0 | 0 | 3 | 0 | 5 | -5 | 0 |
+| 🇦🇷 **Argentina** ✅ | 3 | 0 | 0 | 8 | 2 | +6 | **9** |
+| 🇦🇹 **Austria** ✅ | 1 | 1 | 1 | 6 | 6 | 0 | **4** |
+| 🇩🇿 Argelia | 1 | 1 | 1 | 6 | 7 | -1 | 4 |
+| 🇯🇴 Jordania | 0 | 0 | 3 | 3 | 8 | -5 | 0 |
 
-Partidos: Argentina 2-0 Argelia (EV 2.88) | Austria 2-0 Jordania (EV 2.81) | Argentina 2-1 Austria (EV 2.48) | Jordania 0-1 Argelia (EV 2.36) | Argelia 1-2 Austria (EV 2.31) | Jordania 0-2 Argentina (EV 3.4)
+Partidos: Argentina 3-1 Argelia (EV 2.82) | Austria 3-1 Jordania (EV 2.63) | Argentina 2-0 Austria (EV 2.39) | Jordania 1-2 Argelia (EV 2.31) | Argelia 3-3 Austria (EV 1.01) | Jordania 1-3 Argentina (EV 3.15)
 
 ### GRUPO K
 | Equipo | G | E | P | GF | GC | DG | PTS |
 |---|---|---|---|---|---|---|---|
-| 🇵🇹 **Portugal** ✅ | 3 | 0 | 0 | 7 | 1 | +6 | **9** |
-| 🇨🇴 **Colombia** ✅ | 2 | 0 | 1 | 5 | 2 | +3 | **6** |
-| 🇺🇿 Uzbekistán | 1 | 0 | 2 | 1 | 4 | -3 | 3 |
-| 🇨🇩 R.D. del Congo | 0 | 0 | 3 | 0 | 6 | -6 | 0 |
+| 🇨🇴 **Colombia** ✅ | 2 | 1 | 0 | 4 | 1 | +3 | **7** |
+| 🇵🇹 **Portugal** ✅ | 1 | 2 | 0 | 6 | 1 | +5 | **5** |
+| 🇨🇩 R.D. del Congo | 1 | 1 | 1 | 4 | 3 | +1 | 4 |
+| 🇺🇿 Uzbekistán | 0 | 0 | 3 | 2 | 11 | -9 | 0 |
 
-Partidos: Portugal 3-0 R.D. del Congo (EV 3.24) | Uzbekistán 0-2 Colombia (EV 2.72) | Portugal 2-0 Uzbekistán (EV 3.12) | Colombia 2-0 R.D. del Congo (EV 2.86) | Colombia 1-2 Portugal (EV 2.25) | R.D. del Congo 0-1 Uzbekistán (EV 1.96)
+Partidos: Portugal 1-1 R.D. del Congo (EV 0.95) | Uzbekistán 1-3 Colombia (EV 2.55) | Portugal 5-0 Uzbekistán (EV 2.88) | Colombia 1-0 R.D. del Congo (EV 2.8) | Colombia 0-0 Portugal (EV 1.16) | R.D. del Congo 3-1 Uzbekistán (EV 1.38)
 
 ### GRUPO L
 | Equipo | G | E | P | GF | GC | DG | PTS |
 |---|---|---|---|---|---|---|---|
-| 🏴󠁧󠁢󠁥󠁮󠁧󠁿 **Inglaterra** ✅ | 3 | 0 | 0 | 6 | 1 | +5 | **9** |
-| 🇭🇷 **Croacia** ✅ | 2 | 0 | 1 | 3 | 2 | +1 | **6** |
-| 🇵🇦 Panamá | 1 | 0 | 2 | 1 | 3 | -2 | 3 |
-| 🇬🇭 Ghana | 0 | 0 | 3 | 0 | 4 | -4 | 0 |
+| 🏴󠁧󠁢󠁥󠁮󠁧󠁿 **Inglaterra** ✅ | 2 | 1 | 0 | 6 | 2 | +4 | **7** |
+| 🇭🇷 **Croacia** ✅ | 2 | 0 | 1 | 5 | 5 | 0 | **6** |
+| 🇬🇭 Ghana | 1 | 1 | 1 | 2 | 2 | 0 | 4 |
+| 🇵🇦 Panamá | 0 | 0 | 3 | 0 | 4 | -4 | 0 |
 
-Partidos: Inglaterra 2-1 Croacia (EV 2.3) | Ghana 0-1 Panamá (EV 1.88) | Inglaterra 2-0 Ghana (EV 2.94) | Panamá 0-1 Croacia (EV 2.35) | Panamá 0-2 Inglaterra (EV 2.78) | Croacia 1-0 Ghana (EV 2.36)
+Partidos: Inglaterra 4-2 Croacia (EV 1.87) | Ghana 1-0 Panamá (EV 1.72) | Inglaterra 0-0 Ghana (EV 1.19) | Panamá 0-1 Croacia (EV 2.35) | Panamá 0-2 Inglaterra (EV 2.78) | Croacia 2-1 Ghana (EV 2.32)
 
 ---
 
@@ -237,32 +261,32 @@ Partidos: Inglaterra 2-1 Croacia (EV 2.3) | Ghana 0-1 Panamá (EV 1.88) | Inglat
 ### Clasificados directos (24 = 2 por grupo):
 | Grupo | 1° | 2° |
 |---|---|---|
-| A | 🇲🇽 México | 🇰🇷 Corea del Sur |
-| B | 🇨🇦 Canadá | 🇨🇭 Suiza |
+| A | 🇲🇽 México | 🇿🇦 Sudáfrica |
+| B | 🇨🇭 Suiza | 🇨🇦 Canadá |
 | C | 🇧🇷 Brasil | 🇲🇦 Marruecos |
-| D | 🇺🇸 Estados Unidos | 🇹🇷 Turquía |
-| E | 🇩🇪 Alemania | 🇪🇨 Ecuador |
+| D | 🇺🇸 Estados Unidos | 🇦🇺 Australia |
+| E | 🇩🇪 Alemania | 🇨🇮 Costa de Marfil |
 | F | 🇳🇱 Países Bajos | 🇯🇵 Japón |
 | G | 🇧🇪 Bélgica | 🇪🇬 Egipto |
-| H | 🇪🇸 España | 🇺🇾 Uruguay |
+| H | 🇪🇸 España | 🇨🇻 Cabo Verde |
 | I | 🇫🇷 Francia | 🇳🇴 Noruega |
 | J | 🇦🇷 Argentina | 🇦🇹 Austria |
-| K | 🇵🇹 Portugal | 🇨🇴 Colombia |
+| K | 🇨🇴 Colombia | 🇵🇹 Portugal |
 | L | 🏴󠁧󠁢󠁥󠁮󠁧󠁿 Inglaterra | 🇭🇷 Croacia |
 
 ### Mejores 8 terceros (ranking por pts → DG → GF → ELO):
 | Pos | Equipo | Grupo | Pts | DG | GF | ELO |
 |---|---|---|---|---|---|---|
-| 1 ✅ | 🇸🇳 Senegal | I | 3 | 0 | 4 | 1683 |
-| 2 ✅ | 🏴󠁧󠁢󠁳󠁣󠁴󠁿 Escocia | C | 3 | 0 | 4 | 1631 |
-| 3 ✅ | 🇨🇮 Costa de Marfil | E | 3 | 0 | 4 | 1628 |
-| 4 ✅ | 🇸🇪 Suecia | F | 3 | -1 | 3 | 1648 |
-| 5 ✅ | 🇦🇺 Australia | D | 3 | -1 | 3 | 1628 |
-| 6 ✅ | 🇨🇿 Chequia | A | 3 | -1 | 3 | 1612 |
-| 7 ✅ | 🇧🇦 Bosnia y Herz. | B | 3 | -1 | 3 | 1558 |
-| 8 ✅ | 🇮🇷 Irán | G | 3 | -1 | 1 | 1558 |
+| 1 ✅ | 🇨🇩 R.D. del Congo | K | 4 | +1 | 4 | 1432 |
+| 2 ✅ | 🇸🇪 Suecia | F | 4 | 0 | 7 | 1648 |
+| 3 ✅ | 🇪🇨 Ecuador | E | 4 | 0 | 2 | 1648 |
+| 4 ✅ | 🇬🇭 Ghana | L | 4 | 0 | 2 | 1527 |
+| 5 ✅ | 🇩🇿 Argelia | J | 4 | -1 | 6 | 1589 |
+| 6 ✅ | 🇧🇦 Bosnia y Herz. | B | 4 | -1 | 5 | 1558 |
+| 7 ✅ | 🇵🇾 Paraguay | D | 4 | -2 | 2 | 1569 |
+| 8 ✅ | 🇸🇳 Senegal | I | 3 | +2 | 8 | 1683 |
 
-**Eliminados (4 terceros que no clasifican):** Argelia (J, DG=-2, GF=2, ELO=1589), Panamá (L, DG=-2, GF=1, ELO=1523), Uzbekistán (K, DG=-3, GF=1, ELO=1498), Cabo Verde (H, DG=-4, GF=1, ELO=1489)
+**Eliminados (4 terceros que no clasifican):** Irán (G, DG=+0, GF=3, ELO=1558), Corea del Sur (A, DG=-1, GF=2, ELO=1627), Escocia (C, DG=-3, GF=1, ELO=1631), Uruguay (H, DG=-1, GF=3, ELO=1762)
 
 ---
 
@@ -271,34 +295,34 @@ Partidos: Inglaterra 2-1 Croacia (EV 2.3) | Ghana 0-1 Panamá (EV 1.88) | Inglat
 ### Dieciseisavos de final (R32)
 | Partido | Sede | Local | Marcador | Visitante | Probs L/E/V | EV | Avanza |
 |---|---|---|---|---|---|---|---|
-| M74 | 1E vs 3C | Boston | 🇩🇪 Alemania | 2-0 | 🏴󠁧󠁢󠁳󠁣󠁴󠁿 Escocia | 59.5%/23.7%/16.9% | 2.55 | **Alemania** |
+| M74 | 1E vs 3D | Boston | 🇩🇪 Alemania | 2-0 | 🇵🇾 Paraguay | 64.1%/22.3%/13.6% | 2.75 | **Alemania** |
 | M77 | 1I vs 3F | New York | 🇫🇷 Francia | 2-0 | 🇸🇪 Suecia | 60.2%/23.0%/16.8% | 2.55 | **Francia** |
-| M73 | 2A vs 2B | Los Angeles | 🇰🇷 Corea del Sur | 0-1 | 🇨🇭 Suiza | 25.9%/27.4%/46.8% | 2.15 | **Suiza** |
+| M73 | 2A vs 2B | Los Angeles | 🇿🇦 Sudáfrica | 0-1 | 🇨🇦 Canadá | 19.8%/27.0%/53.2% | None | **Canadá** |
 | M75 | 1F vs 2C | Monterrey | 🇳🇱 Países Bajos | 1-1 (pen: Países Bajos) | 🇲🇦 Marruecos | 42.5%/28.5%/29.0% | 2.15 | **Países Bajos** |
-| M83 | 2K vs 2L | Toronto | 🇨🇴 Colombia | 1-1 (pen: Colombia) | 🇭🇷 Croacia | 42.8%/28.4%/28.8% | 2.14 | **Colombia** |
+| M83 | 2K vs 2L | Toronto | 🇵🇹 Portugal | 1-0 | 🇭🇷 Croacia | 56.4%/24.5%/19.0% | 2.44 | **Portugal** |
 | M84 | 1H vs 2J | Los Angeles | 🇪🇸 España | 2-1 | 🇦🇹 Austria | 56.1%/23.3%/20.7% | 2.42 | **España** |
 | M81 | 1D vs 3B | San Francisco | 🇺🇸 Estados Unidos | 1-0 | 🇧🇦 Bosnia y Herz. | 60.5%/23.8%/15.7% | 2.62 | **Estados Unidos** |
-| M82 | 1G vs 3A | Seattle | 🇧🇪 Bélgica | 1-0 | 🇨🇿 Chequia | 51.8%/26.8%/21.4% | 2.35 | **Bélgica** |
+| M82 | 1G vs 3I | Seattle | 🇧🇪 Bélgica | 1-1 (pen: Bélgica) | 🇸🇳 Senegal | 42.4%/27.7%/30.0% | 2.09 | **Bélgica** |
 | M76 | 1C vs 2F | Houston | 🇧🇷 Brasil | 1-1 (pen: Brasil) | 🇯🇵 Japón | 41.1%/26.8%/32.1% | 2.03 | **Brasil** |
-| M78 | 2E vs 2I | Dallas | 🇪🇨 Ecuador | 1-2 | 🇳🇴 Noruega | 27.2%/27.1%/45.7% | 2.08 | **Noruega** |
-| M79 | 1A vs 3I | Ciudad de Mexico | 🇲🇽 México | 2-1 | 🇸🇳 Senegal | 50.3%/24.5%/25.3% | 2.23 | **México** |
-| M80 | 1L vs 3E | Atlanta | 🏴󠁧󠁢󠁥󠁮󠁧󠁿 Inglaterra | 1-0 | 🇨🇮 Costa de Marfil | 53.8%/25.8%/20.4% | 2.38 | **Inglaterra** |
-| M86 | 1J vs 2H | Miami | 🇦🇷 Argentina | 2-1 | 🇺🇾 Uruguay | 54.0%/24.4%/21.6% | 2.35 | **Argentina** |
-| M88 | 2D vs 2G | Dallas | 🇹🇷 Turquía | 1-1 (pen: Turquía) | 🇪🇬 Egipto | 45.4%/28.3%/26.3% | 2.15 | **Turquía** |
-| M85 | 1B vs 3G | Vancouver | 🇨🇦 Canadá | 1-0 | 🇮🇷 Irán | 55.8%/26.1%/18.1% | 2.51 | **Canadá** |
-| M87 | 1K vs 3D | Kansas City | 🇵🇹 Portugal | 2-0 | 🇦🇺 Australia | 62.0%/22.5%/15.4% | 2.63 | **Portugal** |
+| M78 | 2E vs 2I | Dallas | 🇨🇮 Costa de Marfil | 1-2 | 🇳🇴 Noruega | 25.8%/26.5%/47.7% | 2.15 | **Noruega** |
+| M79 | 1A vs 3E | Ciudad de Mexico | 🇲🇽 México | 2-1 | 🇪🇨 Ecuador | 53.8%/24.2%/22.0% | 2.35 | **México** |
+| M80 | 1L vs 3K | Atlanta | 🏴󠁧󠁢󠁥󠁮󠁧󠁿 Inglaterra | 2-0 | 🇨🇩 R.D. del Congo | 74.2%/17.8%/8.0% | 3.15 | **Inglaterra** |
+| M86 | 1J vs 2H | Miami | 🇦🇷 Argentina | 2-0 | 🇨🇻 Cabo Verde | 78.7%/14.7%/6.5% | 3.24 | **Argentina** |
+| M88 | 2D vs 2G | Dallas | 🇦🇺 Australia | 1-1 (pen: Australia) | 🇪🇬 Egipto | 38.3%/29.6%/32.1% | 2.2 | **Australia** |
+| M85 | 1B vs 3J | Vancouver | 🇨🇭 Suiza | 1-0 | 🇩🇿 Argelia | 49.3%/26.7%/24.1% | 2.22 | **Suiza** |
+| M87 | 1K vs 3L | Kansas City | 🇨🇴 Colombia | 1-0 | 🇬🇭 Ghana | 59.9%/24.2%/15.9% | 2.62 | **Colombia** |
 
 ### Octavos de final (R16)
 | Sede | Local | Marcador | Visitante | Probs L/E/V | EV | Avanza |
 |---|---|---|---|---|---|---|
 | Philadelphia | 🇩🇪 Alemania | 1-1 (pen: Francia) | 🇫🇷 Francia | 34.7%/26.4%/38.9% | 1.99 | **Francia** |
-| Houston | 🇨🇭 Suiza | 1-1 (pen: Países Bajos) | 🇳🇱 Países Bajos | 28.7%/27.4%/43.9% | 2.09 | **Países Bajos** |
-| Dallas | 🇨🇴 Colombia | 1-2 | 🇪🇸 España | 21.0%/24.0%/54.9% | 2.38 | **España** |
+| Houston | 🇨🇦 Canadá | 1-2 | 🇳🇱 Países Bajos | 26.9%/26.9%/46.2% | 2.1 | **Países Bajos** |
+| Dallas | 🇵🇹 Portugal | 1-2 | 🇪🇸 España | 32.2%/25.6%/42.2% | 1.96 | **España** |
 | Seattle | 🇺🇸 Estados Unidos | 1-1 (pen: Estados Unidos) | 🇧🇪 Bélgica | 38.9%/28.1%/33.0% | 2.11 | **Estados Unidos** |
 | New York | 🇧🇷 Brasil | 1-1 (pen: Brasil) | 🇳🇴 Noruega | 40.9%/26.7%/32.5% | 2.02 | **Brasil** |
 | Ciudad de Mexico | 🇲🇽 México | 1-1 (pen: Inglaterra) | 🏴󠁧󠁢󠁥󠁮󠁧󠁿 Inglaterra | 36.7%/26.0%/37.3% | 1.94 | **Inglaterra** |
-| Atlanta | 🇦🇷 Argentina | 2-1 | 🇹🇷 Turquía | 61.2%/22.3%/16.5% | 2.57 | **Argentina** |
-| Vancouver | 🇨🇦 Canadá | 1-2 | 🇵🇹 Portugal | 26.1%/25.1%/48.8% | 2.18 | **Portugal** |
+| Atlanta | 🇦🇷 Argentina | 2-0 | 🇦🇺 Australia | 67.4%/20.6%/12.1% | 2.84 | **Argentina** |
+| Vancouver | 🇨🇭 Suiza | 1-1 (pen: Colombia) | 🇨🇴 Colombia | 34.7%/27.7%/37.6% | 2.08 | **Colombia** |
 
 ### Cuartos de final
 | Sede | Local | Marcador | Visitante | Probs L/E/V | EV | Avanza |
@@ -306,7 +330,7 @@ Partidos: Inglaterra 2-1 Croacia (EV 2.3) | Ghana 0-1 Panamá (EV 1.88) | Inglat
 | Boston | 🇫🇷 Francia | 2-1 | 🇳🇱 Países Bajos | 45.7%/26.0%/28.3% | 2.08 | **Francia** |
 | Los Angeles | 🇪🇸 España | 2-1 | 🇺🇸 Estados Unidos | 50.4%/24.8%/24.8% | 2.24 | **España** |
 | Miami | 🇧🇷 Brasil | 1-1 (pen: Inglaterra) | 🏴󠁧󠁢󠁥󠁮󠁧󠁿 Inglaterra | 35.4%/27.7%/36.9% | 2.07 | **Inglaterra** |
-| Kansas City | 🇦🇷 Argentina | 2-1 | 🇵🇹 Portugal | 43.1%/26.0%/30.9% | 1.99 | **Argentina** |
+| Kansas City | 🇦🇷 Argentina | 2-1 | 🇨🇴 Colombia | 55.6%/24.3%/20.1% | 2.41 | **Argentina** |
 
 ### Semifinales
 | Sede | Local | Marcador | Visitante | Probs L/E/V | EV | Avanza |
@@ -327,33 +351,31 @@ Partidos: Inglaterra 2-1 Croacia (EV 2.3) | Ghana 0-1 Panamá (EV 1.88) | Inglat
 
 | Equipo | P(Campeón) | ELO |
 |---|---|---|
-| 🇦🇷 Argentina | 15.0% | 1962 |
-| 🇪🇸 España | 12.8% | 1913 |
-| 🇵🇹 Portugal | 9.7% | 1856 |
+| 🇦🇷 Argentina | 21.4% | 1962 |
+| 🇪🇸 España | 11.1% | 1913 |
 | 🇫🇷 Francia | 9.6% | 1891 |
 | 🇩🇪 Alemania | 7.6% | 1853 |
-| 🏴󠁧󠁢󠁥󠁮󠁧󠁿 Inglaterra | 5.0% | 1842 |
-| 🇺🇸 Estados Unidos | 4.5% | 1752 |
-| 🇧🇷 Brasil | 4.3% | 1838 |
-| 🇳🇱 Países Bajos | 4.1% | 1836 |
-| 🇧🇪 Bélgica | 3.4% | 1791 |
+| 🇵🇹 Portugal | 6.9% | 1856 |
+| 🏴󠁧󠁢󠁥󠁮󠁧󠁿 Inglaterra | 6.5% | 1842 |
+| 🇺🇸 Estados Unidos | 4.2% | 1752 |
+| 🇧🇷 Brasil | 4.1% | 1838 |
+| 🇳🇱 Países Bajos | 3.7% | 1836 |
+| 🇨🇴 Colombia | 3.2% | 1738 |
+| 🇲🇽 México | 2.7% | 1718 |
 | 🇳🇴 Noruega | 2.6% | 1730 |
 | 🇯🇵 Japón | 2.5% | 1733 |
-| 🇲🇽 México | 2.5% | 1718 |
+| 🇧🇪 Bélgica | 2.4% | 1791 |
+| 🇨🇭 Suiza | 2.4% | 1718 |
 | 🇨🇦 Canadá | 2.2% | 1703 |
-| 🇺🇾 Uruguay | 2.0% | 1762 |
-| 🇨🇭 Suiza | 1.9% | 1718 |
-| 🇨🇴 Colombia | 1.8% | 1738 |
-| 🇲🇦 Marruecos | 1.6% | 1747 |
-| 🇦🇹 Austria | 1.5% | 1720 |
-| 🇹🇷 Turquía | 1.2% | 1680 |
-| 🇸🇳 Senegal | 0.9% | 1683 |
-| 🇪🇨 Ecuador | 0.7% | 1648 |
-| 🇭🇷 Croacia | 0.6% | 1698 |
+| 🇲🇦 Marruecos | 1.7% | 1747 |
+| 🇦🇹 Austria | 1.1% | 1720 |
+| 🇸🇳 Senegal | 1.0% | 1683 |
+| 🇭🇷 Croacia | 0.5% | 1698 |
+| 🇨🇮 Costa de Marfil | 0.5% | 1628 |
+| 🇪🇨 Ecuador | 0.5% | 1648 |
+| 🇦🇺 Australia | 0.5% | 1628 |
 | 🇸🇪 Suecia | 0.4% | 1648 |
-| 🇦🇺 Australia | 0.4% | 1628 |
-| 🇰🇷 Corea del Sur | 0.3% | 1627 |
-| 🇨🇮 Costa de Marfil | 0.3% | 1628 |
+| 🇩🇿 Argelia | 0.3% | 1589 |
 
 ---
 

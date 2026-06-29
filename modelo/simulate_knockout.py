@@ -9,18 +9,17 @@ Cambios v3.2:
   2. Mejores terceros: ranking por pts → DG → GF → ELO. Nota: FIFA usa
      fair play y sorteo como últimos criterios; aquí ELO los sustituye
      (el modelo no simula tarjetas).
-  3. Asignación de terceros a slots: las combinaciones permitidas por slot
-     se verificaron contra el bracket oficial FIFA 2026 (Annex C, vía
-     Wikipedia "2026 FIFA World Cup knockout stage", jun 2026):
+  3. Asignación de terceros a slots: tabla OFICIAL FIFA Annex C (annex_c.py,
+     495 combinaciones, vía Wikipedia "2026 FIFA World Cup knockout stage" /
+     Template:2026 FIFA World Cup third-place table, jun 2026). La combinación
+     de QUÉ 8 grupos aportan tercero fija de forma única qué tercero enfrenta
+     a cada ganador. Conjuntos permitidos por slot (informativos):
        M74: 1E vs 3.° de {A,B,C,D,F}     M81: 1D vs 3.° de {B,E,F,I,J}
        M77: 1I vs 3.° de {C,D,F,G,H}     M82: 1G vs 3.° de {A,E,H,I,J}
        M79: 1A vs 3.° de {C,E,F,H,I}     M85: 1B vs 3.° de {E,F,G,I,J}
        M80: 1L vs 3.° de {E,H,I,J,K}     M87: 1K vs 3.° de {D,E,I,J,L}
-     APROXIMACIÓN: el Annex C real es una tabla de 495 combinaciones que fija
-     una asignación única; aquí se usa backtracking determinista (slots en
-     orden de cuadro, terceros probados en orden de ranking) que produce una
-     asignación VÁLIDA según las restricciones, no necesariamente la misma
-     fila exacta de la tabla FIFA.
+     Se reemplazó el backtracking aproximado anterior por la tabla exacta;
+     el backtracking queda solo como fallback (_assign_thirds_backtrack).
   4. SEDES POR PARTIDO KO (verificadas con el calendario oficial FIFA 2026):
      host advantage y altitud ahora aplican en eliminatoria (ej. México en
      Ciudad de México en M79/M92; la final en New York/East Rutherford).
@@ -49,6 +48,7 @@ from predictor_v3 import (
 from polla_points import best_bet_ko, expected_points_ko, points_ko
 from overrides import ko_override
 from results import ko_result, load_results
+from annex_c import third_group_by_winner
 
 # ---------------------------------------------------------------------------
 # Parámetros
@@ -134,10 +134,20 @@ def _rank_thirds(thirds):
     return sorted(thirds, key=lambda t: (-t["pts"], -t["dg"], -t["gf"], -t["elo"]))
 
 
-def _assign_thirds(best8, slots):
-    """Asigna los 8 mejores terceros a los slots del bracket por backtracking
-    determinista: slots en orden de cuadro, candidatos en orden de ranking.
-    Retorna {match_id: third_dict}. Aproximación al Annex C (ver docstring)."""
+# match_id → letra del ganador de grupo de ese slot (derivado del template).
+# Se usa para mapear la asignación oficial del Annex C (indexada por ganador)
+# de vuelta a los partidos del cuadro.
+SLOT_WINNER = {mid: seed_h[1]
+               for (mid, seed_h, seed_a, _) in R32_TEMPLATE
+               if seed_a.startswith("3:")}
+
+
+def _assign_thirds_backtrack(best8, slots):
+    """Fallback: asigna terceros a slots por backtracking determinista
+    (slots en orden de cuadro, candidatos en orden de ranking). Produce una
+    asignación VÁLIDA según los conjuntos permitidos, pero NO necesariamente
+    la fila oficial del Annex C. Solo se usa si la combinación no está en la
+    tabla (no debería ocurrir con 8 grupos válidos)."""
     assignment, used = {}, set()
 
     def bt(i):
@@ -155,12 +165,29 @@ def _assign_thirds(best8, slots):
         return False
 
     if not bt(0):
-        # No debería ocurrir: el Annex C de FIFA cubre las 495 combinaciones
-        # posibles. Fallback: asignación greedy ignorando restricciones.
         print("ADVERTENCIA: no existe matching válido de terceros; "
               "usando asignación greedy sin restricciones.")
         assignment = {match_id: t for (match_id, _), t in zip(slots, best8)}
     return assignment
+
+
+def _assign_thirds(best8, slots):
+    """Asigna los 8 mejores terceros a los slots del bracket usando la tabla
+    OFICIAL FIFA Annex C (annex_c.py): la combinación de los 8 grupos que
+    aportan tercero determina de forma única qué tercero enfrenta a cada
+    ganador. Retorna {match_id: third_dict}.
+
+    Si la combinación no figura en la tabla (caso imposible con 8 grupos
+    válidos), cae al backtracking aproximado."""
+    winner_to_group = third_group_by_winner(t["group"] for t in best8)
+    if winner_to_group is None:
+        print("ADVERTENCIA: combinación de terceros ausente del Annex C; "
+              "usando backtracking aproximado.")
+        return _assign_thirds_backtrack(best8, slots)
+
+    third_by_group = {t["group"]: t for t in best8}
+    return {mid: third_by_group[winner_to_group[SLOT_WINNER[mid]]]
+            for (mid, _allowed) in slots}
 
 
 def build_r32(conn, verbose=False):

@@ -159,7 +159,50 @@
         1,
         2
       ]
+    },
+    {
+      "home": "Turkey",
+      "away": "USA",
+      "score": [
+        1,
+        3
+      ]
+    },
+    {
+      "home": "Tunisia",
+      "away": "Netherlands",
+      "score": [
+        0,
+        3
+      ]
+    },
+    {
+      "home": "DR Congo",
+      "away": "Uzbekistan",
+      "score": [
+        1,
+        1
+      ]
     }
   ],
-  "ko": []
+  "ko": [
+    {
+      "home": "South Africa",
+      "away": "Canada",
+      "score": [
+        1,
+        2
+      ],
+      "advancer": null
+    },
+    {
+      "home": "Brazil",
+      "away": "Japan",
+      "score": [
+        2,
+        1
+      ],
+      "advancer": null
+    }
+  ]
 }
