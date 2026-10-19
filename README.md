@@ -18,7 +18,22 @@ Modelo de predicción de marcadores exactos para la Copa Mundial FIFA 2026 (USA/
 - **Overrides manuales**: `override.py` permite fijar a mano la apuesta de cualquier partido; el cambio cascadea a la tabla del grupo, el ranking de terceros y el bracket completo. No altera las probabilidades del modelo (Monte Carlo intacto).
 - **Fase eliminatoria**: λ × 0.90 (partidos más cerrados). Prórroga: λ × 1/3 (30 min de 90). Penales: 76% conversión. Bracket R32 derivado dinámicamente del escenario determinista de grupos.
 
-## Rendimiento (v3.1 — validado 9 jun 2026)
+## Resultado en el Mundial real (evaluación post-torneo)
+
+El modelo pre-torneo, sin resultados reales ni ajustes manuales, contra los 104 partidos jugados. Detalle partido a partido en [EVALUACION.md](EVALUACION.md), que se regenera con `python3 modelo/evaluate.py`.
+
+| Métrica | Grupos (72) | Eliminatoria (32) | Total (104) |
+|---|---|---|---|
+| Resultado 1X2 acertado | 60% | 62% | 61% |
+| Marcador exacto | 10% | 25% | 14% |
+| Puntos polla por partido | 2.54 | 3.34 | 2.79 |
+| Baseline "1-0 al favorito ELO" | 2.62 | 2.88 | 2.70 |
+
+- **Campeón:** el modelo proyectaba a Argentina (14.3% en el Monte Carlo) y España quedó segunda (13.4%). España le ganó la final a Argentina 1-0 en la prórroga.
+- **Clasificados a dieciseisavos:** acertó 26 de 32.
+- **Lectura honesta:** el modelo sí tiene señal, con un Brier de 0.513 frente a 0.667 sin información. Pero en la fase de grupos sacó menos puntos que apostar siempre 1-0 al favorito ELO. Donde ganó fue en la eliminatoria, gracias a las apuestas de empate con ganador por penales. El 42% de marcadores exactos de la validación in-sample (ver abajo) bajó a 14% fuera de muestra.
+
+## Rendimiento pre-torneo (v3.1 — validado 9 jun 2026)
 
 | Métrica | Resultado |
 |---|---|
@@ -43,6 +58,7 @@ polla/
 │   ├── app.py               # Mini-app local: dashboard con edición de overrides en vivo
 │   ├── load_history.py      # Carga el histórico internacional (data/raw/) en la DB
 │   ├── report_md.py         # Regenera las tablas de ESTADO_PROYECTO.md
+│   ├── evaluate.py          # Evaluación post-torneo vs resultados reales → EVALUACION.md
 │   ├── update_all_teams.py  # Re-aplica ELO/forma/notas (idempotente, ya no obligatorio)
 │   ├── update_team.py       # CLI para actualizar un equipo individual
 │   └── dashboard.py         # Genera el dashboard HTML
