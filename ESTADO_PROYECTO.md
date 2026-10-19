@@ -13,7 +13,7 @@ Predecir el marcador exacto de cada partido del Mundial USA/Canadá/México 2026
 
 ## 2. Archivos del proyecto
 
-Todos en `/Users/simon/Desktop/polla/modelo/`:
+Todos en `modelo/`:
 
 | Archivo | Función |
 |---|---|
